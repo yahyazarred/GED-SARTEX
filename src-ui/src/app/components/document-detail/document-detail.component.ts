@@ -135,6 +135,7 @@ import { DocumentNotesComponent } from '../document-notes/document-notes.compone
 import { ComponentWithPermissions } from '../with-permissions/with-permissions.component'
 import { DocumentHistoryComponent } from './document-history/document-history.component'
 import { DocumentVersionDropdownComponent } from './document-version-dropdown/document-version-dropdown.component'
+import { DocumentSignaturesComponent } from './document-signatures/document-signatures.component'
 import { MetadataCollapseComponent } from './metadata-collapse/metadata-collapse.component'
 
 enum DocumentDetailNavIDs {
@@ -146,6 +147,7 @@ enum DocumentDetailNavIDs {
   Permissions = 6,
   History = 7,
   Duplicates = 8,
+  Signatures = 9,
 }
 
 enum ContentRenderType {
@@ -198,6 +200,7 @@ interface IncomingDocumentUpdate {
     RouterModule,
     PngxPdfViewerComponent,
     DocumentVersionDropdownComponent,
+    DocumentSignaturesComponent,
   ],
 })
 export class DocumentDetailComponent
@@ -229,6 +232,19 @@ export class DocumentDetailComponent
   private deviceDetectorService = inject(DeviceDetectorService)
   private savedViewService = inject(SavedViewService)
   private readonly websocketStatusService = inject(WebsocketStatusService)
+
+  get showSignatures(): boolean {
+    return (
+      this.permissionsService.currentUserCan(
+        PermissionAction.Add,
+        PermissionType.SignatureRequest
+      ) ||
+      this.permissionsService.currentUserCan(
+        PermissionAction.View,
+        PermissionType.SignatureRequest
+      ) || this.document()?.owner === this.settings.currentUser()?.id
+    )
+  }
 
   @ViewChild('inputTitle')
   titleInput: TextComponent

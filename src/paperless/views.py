@@ -240,6 +240,12 @@ class GroupViewSet(ModelViewSet[Group]):
     filterset_class = GroupFilterSet
     ordering_fields = ("name",)
 
+    def destroy(self, request, *args, **kwargs):
+        group = self.get_object()
+        if hasattr(group, "built_in_identity"):
+            return HttpResponseForbidden("Built-in groups cannot be deleted")
+        return super().destroy(request, *args, **kwargs)
+
 
 class ProfileView(GenericAPIView[Any]):
     """

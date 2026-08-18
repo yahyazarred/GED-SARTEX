@@ -258,6 +258,12 @@ export class PermissionsSelectComponent
     type: PermissionType,
     action: PermissionAction
   ): boolean {
+    if (
+      type === PermissionType.SignatureRequest &&
+      action === PermissionAction.Delete
+    ) {
+      return false
+    }
     // Global statistics and system status only support view
     if (
       type === PermissionType.GlobalStatistics ||

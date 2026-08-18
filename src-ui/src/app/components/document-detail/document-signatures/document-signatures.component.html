@@ -1,0 +1,50 @@
+@if (canRequest) {
+  <div class="card mb-3">
+    <div class="card-header" i18n>Request signature</div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label" for="signatureSigner" i18n>Signer</label>
+        <select id="signatureSigner" class="form-select" multiple size="5" [(ngModel)]="signerIds" [ngModelOptions]="{standalone: true}">
+          @for (signer of signers(); track signer.id) {
+            <option [ngValue]="signer.id">{{ signer.first_name }} {{ signer.last_name }} ({{ signer.username }})</option>
+          }
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="signatureMessage" i18n>Message (optional)</label>
+        <textarea id="signatureMessage" class="form-control" maxlength="1000" rows="2" [(ngModel)]="message" [ngModelOptions]="{standalone: true}"></textarea>
+      </div>
+      <div class="form-text mb-3" i18n>Select one or more signers. Each signer receives an independent request.</div>
+      <button class="btn btn-primary" type="button" [disabled]="!signerIds.length || saving()" (click)="requestSignature()" i18n>Request signature</button>
+    </div>
+  </div>
+}
+
+<div class="list-group">
+  @for (request of requests(); track request.id) {
+    <div class="list-group-item">
+      <div class="d-flex align-items-center gap-2">
+        <strong>{{ request.signer?.first_name }} {{ request.signer?.last_name || request.signer?.username }}</strong>
+        <span class="badge"
+          [class.text-bg-warning]="request.status === SignatureRequestStatus.Pending"
+          [class.text-bg-success]="request.status === SignatureRequestStatus.Signed"
+          [class.text-bg-danger]="request.status === SignatureRequestStatus.Rejected || request.status === SignatureRequestStatus.Failed"
+          [class.text-bg-secondary]="request.status === SignatureRequestStatus.Cancelled">{{ request.status }}</span>
+        <span class="small text-muted ms-auto">{{ request.created | date:'medium' }}</span>
+      </div>
+      <div class="small text-muted" i18n>Requested by {{ request.requester?.username }}</div>
+      @if (request.message) { <div class="mt-2">{{ request.message }}</div> }
+      @if (request.rejection_reason) { <div class="mt-2 text-danger">{{ request.rejection_reason }}</div> }
+      <div class="mt-2 d-flex gap-2">
+        @if (request.signed_version) {
+          <a class="btn btn-sm btn-outline-success" [routerLink]="['/documents', documentId]" i18n>Open signed version</a>
+        }
+        @if (canCancel(request)) {
+          <button class="btn btn-sm btn-outline-danger" type="button" (click)="cancel(request)" i18n>Cancel request</button>
+        }
+      </div>
+    </div>
+  } @empty {
+    <div class="list-group-item text-muted" i18n>No signature requests for this document.</div>
+  }
+</div>

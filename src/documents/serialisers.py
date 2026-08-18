@@ -70,6 +70,8 @@ from documents.models import SavedView
 from documents.models import SavedViewFilterRule
 from documents.models import ShareLink
 from documents.models import ShareLinkBundle
+from documents.models import SignatureProfile
+from documents.models import SignatureRequest
 from documents.models import StoragePath
 from documents.models import Tag
 from documents.models import UiSettings
@@ -1067,6 +1069,138 @@ class NotesSerializer(serializers.ModelSerializer[Note]):
         model = Note
         fields = ["id", "note", "created", "user"]
         ordering = ["-created"]
+
+
+class SignatureProfileSerializer(serializers.ModelSerializer[SignatureProfile]):
+    configured = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignatureProfile
+        fields = ["configured", "original_filename", "mime_type", "modified"]
+
+    def get_configured(self, obj) -> bool:
+        return True
+
+
+class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
+    requester = BasicUserSerializer(read_only=True)
+    signer = BasicUserSerializer(read_only=True)
+    signer_id = serializers.PrimaryKeyRelatedField(
+        source="signer",
+        queryset=User.objects.filter(groups__built_in_identity__key="signers"),
+        write_only=True,
+    )
+    document_title = serializers.CharField(source="document.title", read_only=True)
+    source_is_latest = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignatureRequest
+        fields = [
+            "id",
+            "document",
+            "document_title",
+            "requested_version",
+            "signed_version",
+            "requester",
+            "signer",
+            "signer_id",
+            "status",
+            "message",
+            "rejection_reason",
+            "failure_message",
+            "created",
+            "viewed",
+            "completed",
+            "page",
+            "x",
+            "y",
+            "width",
+            "height",
+            "source_is_latest",
+        ]
+        read_only_fields = [
+            "signed_version",
+            "status",
+            "rejection_reason",
+            "failure_message",
+            "created",
+            "viewed",
+            "completed",
+            "page",
+            "x",
+            "y",
+            "width",
+            "height",
+        ]
+
+    def get_source_is_latest(self, obj) -> bool:
+        root = obj.document.root_document or obj.document
+        latest = root.versions.order_by("-version_index").first()
+        return obj.requested_version_id == (latest.id if latest else root.id)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if request and attrs["signer"] == request.user:
+            raise serializers.ValidationError(
+                {"signer_id": "You cannot request your own signature."},
+            )
+        document = attrs["document"]
+        root = document.root_document or document
+        requested_version = attrs["requested_version"]
+        if requested_version.id != root.id and requested_version.root_document_id != root.id:
+            raise serializers.ValidationError(
+                {"requested_version": "The requested version does not belong to this document."},
+            )
+        attrs["document"] = root
+        return attrs
+
+
+class SignaturePlacementSerializer(serializers.Serializer[dict[str, Any]]):
+    page = serializers.IntegerField(min_value=1)
+    x = serializers.FloatField(min_value=0, max_value=1)
+    y = serializers.FloatField(min_value=0, max_value=1)
+    width = serializers.FloatField(min_value=0.01, max_value=1)
+    height = serializers.FloatField(min_value=0.01, max_value=1)
+
+    def validate(self, attrs):
+        if attrs["x"] + attrs["width"] > 1 or attrs["y"] + attrs["height"] > 1:
+            raise serializers.ValidationError("Signature placement must be within the page.")
+        return attrs
+
+
+class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
+    document = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
+    requested_version = serializers.PrimaryKeyRelatedField(queryset=Document.objects.all())
+    signer_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(groups__built_in_identity__key="signers"),
+        many=True,
+    )
+    message = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+    def validate_signer_ids(self, signers):
+        if not signers:
+            raise serializers.ValidationError("Select at least one signer.")
+        if len({signer.id for signer in signers}) != len(signers):
+            raise serializers.ValidationError("A signer may only be selected once.")
+        request = self.context.get("request")
+        if request and request.user in signers:
+            raise serializers.ValidationError("You cannot request your own signature.")
+        return signers
+
+    def validate(self, attrs):
+        document = attrs["document"]
+        root = document.root_document or document
+        version = attrs["requested_version"]
+        if version.id != root.id and version.root_document_id != root.id:
+            raise serializers.ValidationError(
+                {"requested_version": "The requested version does not belong to this document."},
+            )
+        attrs["document"] = root
+        return attrs
+
+
+class SignatureRejectionSerializer(serializers.Serializer[dict[str, str]]):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
 
 
 def _get_viewable_duplicates(

@@ -46,6 +46,12 @@ export class UsersAndGroupsComponent
   readonly users = signal<User[]>(null)
   readonly groups = signal<Group[]>(null)
 
+  public orderedGroups(): Group[] {
+    return [...(this.groups() ?? [])].sort(
+      (a, b) => Number(!!b.built_in) - Number(!!a.built_in) || (a.name ?? '').localeCompare(b.name ?? '')
+    )
+  }
+
   unsubscribeNotifier: Subject<any> = new Subject()
 
   public get canViewUsers(): boolean {
@@ -190,6 +196,7 @@ export class UsersAndGroupsComponent
   }
 
   deleteGroup(group: Group) {
+    if (group.built_in) return
     let modal = this.modalService.open(ConfirmDialogComponent, {
       backdrop: 'static',
     })

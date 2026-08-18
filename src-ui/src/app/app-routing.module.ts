@@ -16,6 +16,7 @@ import { MailComponent } from './components/manage/mail/mail.component'
 import { SavedViewsComponent } from './components/manage/saved-views/saved-views.component'
 import { WorkflowsComponent } from './components/manage/workflows/workflows.component'
 import { NotFoundComponent } from './components/not-found/not-found.component'
+import { ParapheurComponent } from './components/parapheur/parapheur.component'
 import { DirtyDocGuard } from './guards/dirty-doc.guard'
 import { DirtyFormGuard } from './guards/dirty-form.guard'
 import { DirtySavedViewGuard } from './guards/dirty-saved-view.guard'
@@ -174,6 +175,11 @@ export const routes: Routes = [
         path: 'cabinets',
         redirectTo: '/attributes/cabinets',
         pathMatch: 'full',
+      },
+      {
+        path: 'parapheur',
+        component: ParapheurComponent,
+        data: { componentName: 'ParapheurComponent' },
       },
       {
         path: 'storagepaths',

@@ -11,6 +11,16 @@ export enum WebsocketStatusType {
   STATUS_UPDATE = 'status_update',
   DOCUMENTS_DELETED = 'documents_deleted',
   DOCUMENT_UPDATED = 'document_updated',
+  SIGNATURE_REQUEST_UPDATED = 'signature_request_updated',
+}
+
+export interface WebsocketSignatureRequestUpdatedMessage {
+  request_id: number
+  document_id: number
+  status: string
+  owner_id?: number
+  users_can_view?: number[]
+  groups_can_view?: number[]
 }
 
 // see ProgressStatusOptions in src/documents/plugins/helpers.py
@@ -115,6 +125,8 @@ export class WebsocketStatusService {
   private readonly documentDeletedSubject = new Subject<boolean>()
   private readonly documentUpdatedSubject =
     new Subject<WebsocketDocumentUpdatedMessage>()
+  private readonly signatureRequestUpdatedSubject =
+    new Subject<WebsocketSignatureRequestUpdatedMessage>()
   private readonly connectionStatusSubject = new Subject<boolean>()
 
   private get(taskId: string, filename?: string) {
@@ -191,6 +203,7 @@ export class WebsocketStatusService {
           | WebsocketProgressMessage
           | WebsocketDocumentsDeletedMessage
           | WebsocketDocumentUpdatedMessage
+          | WebsocketSignatureRequestUpdatedMessage
       } = JSON.parse(ev.data)
 
       switch (type) {
@@ -206,6 +219,18 @@ export class WebsocketStatusService {
 
         case WebsocketStatusType.STATUS_UPDATE:
           this.handleProgressUpdate(messageData as WebsocketProgressMessage)
+          break
+
+        case WebsocketStatusType.SIGNATURE_REQUEST_UPDATED:
+          if (
+            this.canViewMessage(
+              messageData as WebsocketSignatureRequestUpdatedMessage
+            )
+          ) {
+            this.signatureRequestUpdatedSubject.next(
+              messageData as WebsocketSignatureRequestUpdatedMessage
+            )
+          }
           break
       }
     }
@@ -345,6 +370,10 @@ export class WebsocketStatusService {
 
   onDocumentUpdated() {
     return this.documentUpdatedSubject
+  }
+
+  onSignatureRequestUpdated() {
+    return this.signatureRequestUpdatedSubject.asObservable()
   }
 
   onConnectionStatus() {

@@ -102,6 +102,18 @@
               <i-bs class="me-2" name="archive"></i-bs><span><ng-container i18n>Cabinets</ng-container></span>
             </a>
           </li>
+          @if (settingsService.currentUser()?.is_signer) {
+            <li class="nav-item app-link">
+              <a class="nav-link position-relative" routerLink="parapheur" routerLinkActive="active" (click)="closeMenu()"
+                ngbPopover="Parapheur" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"
+                container="body" triggers="mouseenter:mouseleave" popoverClass="popover-slim">
+                <i-bs class="me-2" name="pen"></i-bs><span><ng-container i18n>Parapheur</ng-container></span>
+                @if (pendingSignatureCount() > 0) {
+                  <span class="badge rounded-pill text-bg-danger ms-2">{{ pendingSignatureCount() }}</span>
+                }
+              </a>
+            </li>
+          }
         </ul>
 
         <div class="nav-group mt-3 mb-1" *pngxIfPermissions="{ action: PermissionAction.View, type: PermissionType.SavedView }">

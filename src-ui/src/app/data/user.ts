@@ -12,4 +12,6 @@ export interface User extends ObjectWithId {
   user_permissions?: string[]
   inherited_permissions?: string[]
   is_mfa_enabled?: boolean
+  is_signer?: boolean
+  signature_configured?: boolean
 }

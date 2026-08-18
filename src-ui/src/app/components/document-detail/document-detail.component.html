@@ -410,6 +410,18 @@
           </li>
         }
 
+        @if (showSignatures) {
+          <li [ngbNavItem]="DocumentDetailNavIDs.Signatures">
+            <a ngbNavLink i18n>Signatures</a>
+            <ng-template ngbNavContent>
+              <pngx-document-signatures
+                [documentId]="documentId()"
+                [versionId]="selectedVersionId()">
+              </pngx-document-signatures>
+            </ng-template>
+          </li>
+        }
+
         @if (document()?.duplicate_documents?.length) {
           <li [ngbNavItem]="DocumentDetailNavIDs.Duplicates">
             <a class="text-nowrap" ngbNavLink i18n>

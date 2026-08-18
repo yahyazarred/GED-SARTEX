@@ -84,6 +84,8 @@ class UserSerializer(PasswordValidationMixin, serializers.ModelSerializer[User])
     )
     inherited_permissions = serializers.SerializerMethodField()
     is_mfa_enabled = serializers.SerializerMethodField()
+    is_signer = serializers.SerializerMethodField()
+    signature_configured = serializers.SerializerMethodField()
 
     def get_is_mfa_enabled(self, user: User) -> bool:
         mfa_adapter = get_mfa_adapter()
@@ -106,7 +108,16 @@ class UserSerializer(PasswordValidationMixin, serializers.ModelSerializer[User])
             "user_permissions",
             "inherited_permissions",
             "is_mfa_enabled",
+            "is_signer",
+            "signature_configured",
         )
+
+    def get_is_signer(self, user: User) -> bool:
+        return user.groups.filter(built_in_identity__key="signers").exists()
+
+    def get_signature_configured(self, user: User) -> bool:
+        request = self.context.get("request")
+        return bool(request and request.user == user and hasattr(user, "signature_profile"))
 
     def get_inherited_permissions(self, obj) -> list[str]:
         return obj.get_group_permissions()
@@ -148,6 +159,8 @@ class GroupSerializer(serializers.ModelSerializer[Group]):
         queryset=Permission.objects.exclude(content_type__app_label="admin"),
         slug_field="codename",
     )
+    built_in = serializers.SerializerMethodField()
+    built_in_key = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
@@ -155,7 +168,16 @@ class GroupSerializer(serializers.ModelSerializer[Group]):
             "id",
             "name",
             "permissions",
+            "built_in",
+            "built_in_key",
         )
+
+    def get_built_in(self, group: Group) -> bool:
+        return hasattr(group, "built_in_identity")
+
+    def get_built_in_key(self, group: Group) -> str | None:
+        identity = getattr(group, "built_in_identity", None)
+        return identity.key if identity else None
 
 
 class SocialAccountSerializer(serializers.ModelSerializer[SocialAccount]):

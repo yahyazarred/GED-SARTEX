@@ -1,9 +1,31 @@
+from django.contrib.auth.models import Group
 from django.core.validators import FileExtensionValidator
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 DEFAULT_SINGLETON_INSTANCE_ID = 1
+
+
+class BuiltInGroup(models.Model):
+    """Stable identity for protected groups whose display name may be changed."""
+
+    class Key(models.TextChoices):
+        SIGNERS = ("signers", _("Signers"))
+
+    group = models.OneToOneField(
+        Group,
+        on_delete=models.PROTECT,
+        related_name="built_in_identity",
+    )
+    key = models.CharField(max_length=64, unique=True, choices=Key.choices)
+
+    class Meta:
+        verbose_name = _("built-in group")
+        verbose_name_plural = _("built-in groups")
+
+    def __str__(self) -> str:
+        return self.group.name
 
 
 class AbstractSingletonModel(models.Model):

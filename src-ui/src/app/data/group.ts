@@ -6,4 +6,6 @@ export interface Group extends ObjectWithId {
   user_count?: number // not implemented yet
 
   permissions?: string[]
+  built_in?: boolean
+  built_in_key?: string
 }

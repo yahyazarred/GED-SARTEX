@@ -1,0 +1,90 @@
+<pngx-page-header title="Parapheur" i18n-title info="Review and sign documents assigned to you." i18n-info>
+  <button class="btn btn-sm btn-outline-primary" type="button" (click)="editSignature()">
+    <i-bs name="pen" class="me-1"></i-bs><ng-container i18n>My signature</ng-container>
+  </button>
+</pngx-page-header>
+
+@if (!isSigner) {
+  <div class="alert alert-danger" i18n>You must belong to the built-in Signers group to access Parapheur.</div>
+} @else if (selected()) {
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="selected.set(null)" i18n>Back</button>
+    <strong>{{ selected().document_title }}</strong>
+    @if (!selected().source_is_latest) {
+      <span class="badge text-bg-warning" i18n>This request targets an older version</span>
+    }
+    <span class="ms-auto" i18n>Page {{ page }} of {{ pageCount }}</span>
+    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="previousPage()" [disabled]="page <= 1" i18n>Previous</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="nextPage()" [disabled]="page >= pageCount" i18n>Next</button>
+  </div>
+  @if (selected().message) {
+    <div class="alert alert-light border"><strong i18n>Request message:</strong> {{ selected().message }}</div>
+  }
+  <div #viewerHost class="signature-reader">
+    <pngx-pdf-viewer
+      [src]="documentUrl"
+      [renderMode]="PdfRenderMode.All"
+      [page]="page"
+      (pageChange)="page = $event; attachSignatureToPage()"
+      [zoomScale]="PdfZoomScale.PageWidth"
+      [zoom]="PdfZoomLevel.One"
+      (afterLoadComplete)="pdfLoaded($event)"
+      (rendered)="pdfRendered()"
+      (loadError)="pdfLoadError($event)">
+    </pngx-pdf-viewer>
+    <div #signatureBox class="signature-box">
+      <img [src]="profileService.previewUrl()" alt="Your signature" i18n-alt draggable="false" />
+      <span class="signature-drag-handle" (pointerdown)="startDrag($event)" i18n>Drag to move</span>
+      <span class="resize-hint" i18n>Drag corner to resize</span>
+    </div>
+  </div>
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <button class="btn btn-outline-danger" type="button" (click)="reject(selected())" i18n>Reject</button>
+    <button class="btn btn-primary" type="button" (click)="confirmSignature()" [disabled]="signing()">
+      @if (signing()) { <span class="spinner-border spinner-border-sm me-1"></span> }
+      <ng-container i18n>Confirm signature</ng-container>
+    </button>
+  </div>
+} @else {
+  <div class="d-flex gap-2 mb-3">
+    <input class="form-control form-control-sm" type="search" [(ngModel)]="search" (keyup.enter)="reload()" placeholder="Search by document, requester or signer" i18n-placeholder />
+    <select class="form-select form-select-sm w-auto" [(ngModel)]="status" (ngModelChange)="changeStatus()">
+      <option [ngValue]="null" i18n>All requests</option>
+      <option [ngValue]="SignatureRequestStatus.Pending" i18n>Pending</option>
+      <option [ngValue]="SignatureRequestStatus.Signed" i18n>Signed</option>
+      <option [ngValue]="SignatureRequestStatus.Rejected" i18n>Rejected</option>
+      <option [ngValue]="SignatureRequestStatus.Cancelled" i18n>Cancelled</option>
+      <option [ngValue]="SignatureRequestStatus.Failed" i18n>Failed</option>
+    </select>
+    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="reload()" i18n>Refresh</button>
+  </div>
+  @if (loading()) {
+    <div class="spinner-border spinner-border-sm" role="status"></div>
+  } @else {
+    <div class="list-group">
+      @for (request of requests(); track request.id) {
+        <div class="list-group-item d-flex align-items-center gap-3">
+          <div class="flex-grow-1">
+            <a [routerLink]="['/documents', request.document]">{{ request.document_title }}</a>
+            <div class="small text-muted">
+              <span i18n>Requested by {{ request.requester?.username }}</span> · {{ request.created | date:'medium' }}
+            </div>
+            @if (request.message) { <div class="small mt-1">{{ request.message }}</div> }
+            @if (request.status === SignatureRequestStatus.Failed && request.failure_message) {
+              <div class="small text-danger mt-1">{{ request.failure_message }}</div>
+            }
+          </div>
+          <span class="badge text-bg-secondary">{{ request.status }}</span>
+          @if (request.status === SignatureRequestStatus.Pending) {
+            <button class="btn btn-sm btn-outline-danger" type="button" (click)="reject(request)" i18n>Reject</button>
+          }
+          @if (request.status === SignatureRequestStatus.Pending || request.status === SignatureRequestStatus.Failed) {
+            <button class="btn btn-sm btn-primary" type="button" (click)="open(request)" i18n>Review & sign</button>
+          }
+        </div>
+      } @empty {
+        <div class="list-group-item text-muted" i18n>No signature requests found.</div>
+      }
+    </div>
+  }
+}

@@ -1,5 +1,6 @@
 import json
 
+from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.auth.models import User
 from django.test import override_settings
@@ -7,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from documents.tests.utils import DirectoriesMixin
+from paperless.models import BuiltInGroup
 from paperless.version import __full_version_str__
 
 
@@ -42,6 +44,7 @@ class TestApiUiSettings(DirectoriesMixin, APITestCase):
                 "username": self.test_user.username,
                 "is_staff": True,
                 "is_superuser": True,
+                "is_signer": False,
                 "groups": [],
                 "first_name": self.test_user.first_name,
                 "last_name": self.test_user.last_name,
@@ -62,6 +65,19 @@ class TestApiUiSettings(DirectoriesMixin, APITestCase):
                 "ai_enabled": False,
             },
         )
+
+    def test_api_get_ui_settings_identifies_signer(self) -> None:
+        signers = Group.objects.create(name="Signers")
+        BuiltInGroup.objects.create(
+            key=BuiltInGroup.Key.SIGNERS,
+            group=signers,
+        )
+        self.test_user.groups.add(signers)
+
+        response = self.client.get(self.ENDPOINT, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIs(response.data["user"]["is_signer"], True)
 
     def test_api_set_ui_settings(self) -> None:
         settings = {

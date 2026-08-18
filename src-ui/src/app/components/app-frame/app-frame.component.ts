@@ -6,7 +6,15 @@ import {
   moveItemInArray,
 } from '@angular/cdk/drag-drop'
 import { NgClass } from '@angular/common'
-import { Component, HostListener, inject, OnInit, signal } from '@angular/core'
+import {
+  Component,
+  DestroyRef,
+  HostListener,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core'
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
 import { ActivatedRoute, Router, RouterModule } from '@angular/router'
 import {
   NgbCollapseModule,
@@ -17,7 +25,7 @@ import {
 } from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import { TourNgBootstrap } from 'ngx-ui-tour-ng-bootstrap'
-import { Observable } from 'rxjs'
+import { Observable, timer } from 'rxjs'
 import { first } from 'rxjs/operators'
 import { Document } from 'src/app/data/document'
 import { SavedView } from 'src/app/data/saved-view'
@@ -40,9 +48,11 @@ import {
   RemoteVersionService,
 } from 'src/app/services/rest/remote-version.service'
 import { SavedViewService } from 'src/app/services/rest/saved-view.service'
+import { SignatureRequestService } from 'src/app/services/rest/signature-request.service'
 import { SettingsService } from 'src/app/services/settings.service'
 import { TasksService } from 'src/app/services/tasks.service'
 import { ToastService } from 'src/app/services/toast.service'
+import { WebsocketStatusService } from 'src/app/services/websocket-status.service'
 import { environment } from 'src/environments/environment'
 import { ChatComponent } from '../chat/chat/chat.component'
 import { ProfileEditDialogComponent } from '../common/profile-edit-dialog/profile-edit-dialog.component'
@@ -89,11 +99,15 @@ export class AppFrameComponent
   private modalService = inject(NgbModal)
   permissionsService = inject(PermissionsService)
   private djangoMessagesService = inject(DjangoMessagesService)
+  private signatureRequestsService = inject(SignatureRequestService)
+  private websocketStatusService = inject(WebsocketStatusService)
+  private readonly destroyRef = inject(DestroyRef)
 
   readonly appRemoteVersion = signal<AppRemoteVersion>(null)
   readonly isMenuCollapsed = signal(true)
   readonly slimSidebarAnimating = signal(false)
   readonly mobileSearchHidden = signal(false)
+  readonly pendingSignatureCount = signal(0)
   private lastScrollY: number = 0
 
   constructor() {
@@ -114,6 +128,20 @@ export class AppFrameComponent
 
   ngOnInit(): void {
     this.lastScrollY = window.scrollY
+
+    if (this.settingsService.currentUser()?.is_signer) {
+      timer(0, 5_000)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.reloadPendingSignatureCount())
+      this.signatureRequestsService
+        .onChanged()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.reloadPendingSignatureCount())
+      this.websocketStatusService
+        .onSignatureRequestUpdated()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.reloadPendingSignatureCount())
+    }
 
     if (this.settingsService.get(SETTINGS_KEYS.UPDATE_CHECKING_ENABLED)) {
       this.checkForUpdates()
@@ -140,6 +168,15 @@ export class AppFrameComponent
           break
       }
     })
+  }
+
+  private reloadPendingSignatureCount(): void {
+    this.signatureRequestsService
+      .list(1, 1, null, null, {
+        status: 'pending',
+        assigned_to_me: true,
+      })
+      .subscribe((result) => this.pendingSignatureCount.set(result.count))
   }
 
   toggleSlimSidebar(): void {

@@ -897,6 +897,100 @@ class Note(SoftDeleteModel):
         return self.note
 
 
+def signature_upload_path(instance, filename: str) -> str:
+    extension = Path(filename).suffix.lower()
+    return f"signatures/{instance.user_id}/signature{extension}"
+
+
+class SignatureProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="signature_profile",
+    )
+    signature_file = models.FileField(upload_to=signature_upload_path)
+    original_filename = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=100)
+    checksum = models.CharField(max_length=64, editable=False)
+    modified = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("signature profile")
+        verbose_name_plural = _("signature profiles")
+
+    def __str__(self) -> str:
+        return f"Signature for {self.user.username}"
+
+
+class SignatureRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = ("pending", _("Pending"))
+        PROCESSING = ("processing", _("Processing"))
+        SIGNED = ("signed", _("Signed"))
+        REJECTED = ("rejected", _("Rejected"))
+        CANCELLED = ("cancelled", _("Cancelled"))
+        FAILED = ("failed", _("Failed"))
+
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="signature_requests",
+    )
+    requested_version = models.ForeignKey(
+        Document,
+        on_delete=models.PROTECT,
+        related_name="signature_requests_as_source",
+    )
+    signed_version = models.OneToOneField(
+        Document,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="completed_signature_request",
+    )
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_signature_requests",
+    )
+    signer = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="assigned_signature_requests",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    message = models.TextField(blank=True, max_length=1000)
+    rejection_reason = models.TextField(blank=True, max_length=1000)
+    created = models.DateTimeField(default=timezone.now, db_index=True)
+    viewed = models.DateTimeField(blank=True, null=True)
+    completed = models.DateTimeField(blank=True, null=True)
+    page = models.PositiveIntegerField(blank=True, null=True)
+    x = models.FloatField(blank=True, null=True)
+    y = models.FloatField(blank=True, null=True)
+    width = models.FloatField(blank=True, null=True)
+    height = models.FloatField(blank=True, null=True)
+    signature_checksum = models.CharField(max_length=64, blank=True)
+    failure_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "requested_version", "signer"],
+                condition=models.Q(status__in=["pending", "processing"]),
+                name="documents_unique_pending_signature_request",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.document_id} → {self.signer.username} ({self.status})"
+
+
 class ShareLink(SoftDeleteModel):
     class FileVersion(models.TextChoices):
         ARCHIVE = ("archive", _("Archive"))
@@ -1285,6 +1379,8 @@ if settings.AUDIT_LOG_ENABLED:
     auditlog.register(DocumentType)
     auditlog.register(Cabinet)
     auditlog.register(Note)
+    auditlog.register(SignatureProfile, exclude_fields=["signature_file"])
+    auditlog.register(SignatureRequest)
     auditlog.register(CustomField)
     auditlog.register(CustomFieldInstance)
 
