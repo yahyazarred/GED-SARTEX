@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from pathlib import Path
 from typing import Final
 
@@ -902,6 +903,14 @@ def signature_upload_path(instance, filename: str) -> str:
     return f"signatures/{instance.user_id}/signature{extension}"
 
 
+def processed_signature_upload_path(instance, filename: str) -> str:
+    return f"signatures/{instance.user_id}/signature-transparent.png"
+
+
+def signed_document_upload_path(instance, filename: str) -> str:
+    return f"signed-documents/{instance.document_id}/{uuid.uuid4().hex}.pdf"
+
+
 class SignatureProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -909,6 +918,10 @@ class SignatureProfile(models.Model):
         related_name="signature_profile",
     )
     signature_file = models.FileField(upload_to=signature_upload_path)
+    processed_file = models.FileField(
+        upload_to=processed_signature_upload_path,
+        blank=True,
+    )
     original_filename = models.CharField(max_length=255)
     mime_type = models.CharField(max_length=100)
     checksum = models.CharField(max_length=64, editable=False)
@@ -920,6 +933,55 @@ class SignatureProfile(models.Model):
 
     def __str__(self) -> str:
         return f"Signature for {self.user.username}"
+
+
+class SignedDocument(ModelWithOwner):
+    signature_request = models.OneToOneField(
+        "SignatureRequest",
+        on_delete=models.PROTECT,
+        related_name="signed_document",
+    )
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.PROTECT,
+        related_name="signed_documents",
+    )
+    source_version = models.ForeignKey(
+        Document,
+        on_delete=models.PROTECT,
+        related_name="signed_copies_as_source",
+    )
+    signer = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="signed_documents",
+    )
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="requested_signed_documents",
+    )
+    signed_file = models.FileField(upload_to=signed_document_upload_path)
+    file_checksum = models.CharField(max_length=64, editable=False)
+    signature_checksum = models.CharField(max_length=64, editable=False)
+    created = models.DateTimeField(default=timezone.now, db_index=True)
+    page = models.PositiveIntegerField()
+    x = models.FloatField()
+    y = models.FloatField()
+    width = models.FloatField()
+    height = models.FloatField()
+
+    class Meta:
+        ordering = ("-created",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_version", "signer"],
+                name="documents_unique_signed_copy_per_version_signer",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_version_id} signed by {self.signer.username}"
 
 
 class SignatureRequest(models.Model):
@@ -940,13 +1002,6 @@ class SignatureRequest(models.Model):
         Document,
         on_delete=models.PROTECT,
         related_name="signature_requests_as_source",
-    )
-    signed_version = models.OneToOneField(
-        Document,
-        blank=True,
-        null=True,
-        on_delete=models.PROTECT,
-        related_name="completed_signature_request",
     )
     requester = models.ForeignKey(
         User,
@@ -1379,8 +1434,12 @@ if settings.AUDIT_LOG_ENABLED:
     auditlog.register(DocumentType)
     auditlog.register(Cabinet)
     auditlog.register(Note)
-    auditlog.register(SignatureProfile, exclude_fields=["signature_file"])
+    auditlog.register(
+        SignatureProfile,
+        exclude_fields=["signature_file", "processed_file"],
+    )
     auditlog.register(SignatureRequest)
+    auditlog.register(SignedDocument, exclude_fields=["signed_file"])
     auditlog.register(CustomField)
     auditlog.register(CustomFieldInstance)
 

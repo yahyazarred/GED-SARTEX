@@ -42,6 +42,7 @@ from documents.views import ShareLinkBundleViewSet
 from documents.views import ShareLinkViewSet
 from documents.views import SignatureProfileViewSet
 from documents.views import SignatureRequestViewSet
+from documents.views import SignedDocumentViewSet
 from documents.views import StatisticsView
 from documents.views import StoragePathViewSet
 from documents.views import SystemStatusView
@@ -88,6 +89,7 @@ api_router.register(r"share_link_bundles", ShareLinkBundleViewSet)
 api_router.register(r"share_links", ShareLinkViewSet)
 api_router.register(r"signature_profile", SignatureProfileViewSet, basename="signature-profile")
 api_router.register(r"signature_requests", SignatureRequestViewSet, basename="signature-request")
+api_router.register(r"signed_documents", SignedDocumentViewSet, basename="signed-document")
 api_router.register(r"workflow_triggers", WorkflowTriggerViewSet)
 api_router.register(r"workflow_actions", WorkflowActionViewSet)
 api_router.register(r"workflows", WorkflowViewSet)

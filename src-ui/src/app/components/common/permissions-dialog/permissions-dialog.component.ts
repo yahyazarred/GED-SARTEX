@@ -44,6 +44,13 @@ export class PermissionsDialogComponent {
   readonly note = signal<string>(null)
   readonly buttonsEnabled = signal(true)
   private o: ObjectWithPermissions = undefined
+  protectedUserId: number = null
+
+  visibleUsers(): User[] {
+    return (this.users() ?? []).filter(
+      (user) => user.id !== this.protectedUserId
+    )
+  }
 
   @Output()
   public confirmClicked = new EventEmitter()
@@ -52,11 +59,20 @@ export class PermissionsDialogComponent {
   set object(o: ObjectWithPermissions) {
     this.o = o
     this.title.set($localize`Edit permissions for ` + o['name'])
+    const permissions = structuredClone(o.permissions)
+    if (this.protectedUserId && permissions) {
+      permissions.view.users = permissions.view.users.filter(
+        (id) => id !== this.protectedUserId
+      )
+      permissions.change.users = permissions.change.users.filter(
+        (id) => id !== this.protectedUserId
+      )
+    }
     this.form.patchValue({
       merge: true,
       permissions_form: {
         owner: o.owner,
-        set_permissions: o.permissions,
+        set_permissions: permissions,
       },
     })
   }
@@ -71,19 +87,21 @@ export class PermissionsDialogComponent {
   })
 
   get permissions() {
+    const setPermissions = this.form.get('permissions_form').value
+      ?.set_permissions ?? {
+      view: { users: [], groups: [] },
+      change: { users: [], groups: [] },
+    }
+    if (this.protectedUserId) {
+      for (const action of ['view', 'change'] as const) {
+        setPermissions[action].users = Array.from(
+          new Set([...(setPermissions[action].users ?? []), this.protectedUserId])
+        )
+      }
+    }
     return {
       owner: this.form.get('permissions_form').value?.owner ?? null,
-      set_permissions: this.form.get('permissions_form').value
-        ?.set_permissions ?? {
-        view: {
-          users: [],
-          groups: [],
-        },
-        change: {
-          users: [],
-          groups: [],
-        },
-      },
+      set_permissions: setPermissions,
     }
   }
 

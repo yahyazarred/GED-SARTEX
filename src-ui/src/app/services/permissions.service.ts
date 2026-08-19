@@ -17,6 +17,7 @@ export enum PermissionType {
   StoragePath = '%s_storagepath',
   Cabinet = '%s_cabinet',
   SignatureRequest = '%s_signaturerequest',
+  SignedDocument = '%s_signeddocument',
   SavedView = '%s_savedview',
   PaperlessTask = '%s_paperlesstask',
   AppConfig = '%s_applicationconfiguration',

@@ -1,21 +1,53 @@
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button class="nav-link" type="button" [class.active]="activeView === 'requests'" (click)="activeView = 'requests'">
+      <span i18n>Requests</span>
+      <span class="badge rounded-pill text-bg-secondary ms-2">{{ requests().length }}</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" type="button" [class.active]="activeView === 'signed'" (click)="activeView = 'signed'">
+      <span i18n>Signed copies</span>
+      <span class="badge rounded-pill text-bg-success ms-2">{{ signedDocuments().length }}</span>
+    </button>
+  </li>
+</ul>
+
+@if (activeView === 'requests') {
 @if (canRequest) {
   <div class="card mb-3">
     <div class="card-header" i18n>Request signature</div>
     <div class="card-body">
       <div class="mb-3">
-        <label class="form-label" for="signatureSigner" i18n>Signer</label>
-        <select id="signatureSigner" class="form-select" multiple size="5" [(ngModel)]="signerIds" [ngModelOptions]="{standalone: true}">
+        <label class="form-label" i18n>Choose signers</label>
+        <div class="signer-picker" role="group" aria-label="Available signers" i18n-aria-label>
           @for (signer of signers(); track signer.id) {
-            <option [ngValue]="signer.id">{{ signer.first_name }} {{ signer.last_name }} ({{ signer.username }})</option>
+            <button
+              class="signer-option"
+              [class.selected]="signerSelected(signer.id)"
+              type="button"
+              [attr.aria-pressed]="signerSelected(signer.id)"
+              (click)="selectSigner(signer.id)">
+              <span class="signer-avatar">{{ (signer.first_name || signer.username).charAt(0).toUpperCase() }}</span>
+              <span class="text-start overflow-hidden">
+                <span class="d-block fw-semibold text-truncate">{{ signerName(signer) }}</span>
+                <span class="d-block small text-muted text-truncate">{{ signer.username }}</span>
+              </span>
+              @if (signerSelected(signer.id)) {
+                <span class="ms-auto text-primary" aria-hidden="true">✓</span>
+              }
+            </button>
+          } @empty {
+            <div class="text-muted small p-3" i18n>No other signers are available.</div>
           }
-        </select>
+        </div>
       </div>
       <div class="mb-3">
         <label class="form-label" for="signatureMessage" i18n>Message (optional)</label>
         <textarea id="signatureMessage" class="form-control" maxlength="1000" rows="2" [(ngModel)]="message" [ngModelOptions]="{standalone: true}"></textarea>
       </div>
-      <div class="form-text mb-3" i18n>Select one or more signers. Each signer receives an independent request.</div>
-      <button class="btn btn-primary" type="button" [disabled]="!signerIds.length || saving()" (click)="requestSignature()" i18n>Request signature</button>
+      <div class="form-text mb-3" i18n>Select one signer who has permission to view this document.</div>
+      <button class="btn btn-primary" type="button" [disabled]="!signerId || saving()" (click)="requestSignature()" i18n>Request signature</button>
     </div>
   </div>
 }
@@ -35,9 +67,12 @@
       <div class="small text-muted" i18n>Requested by {{ request.requester?.username }}</div>
       @if (request.message) { <div class="mt-2">{{ request.message }}</div> }
       @if (request.rejection_reason) { <div class="mt-2 text-danger">{{ request.rejection_reason }}</div> }
+      @if (request.signed_copy_deleted) {
+        <div><span class="badge text-bg-danger mt-2" i18n>Signed copy deleted</span></div>
+      }
       <div class="mt-2 d-flex gap-2">
-        @if (request.signed_version) {
-          <a class="btn btn-sm btn-outline-success" [routerLink]="['/documents', documentId]" i18n>Open signed version</a>
+        @if (request.signed_document) {
+          <a class="btn btn-sm btn-outline-success" [href]="signedDocumentsService.fileUrl(request.signed_document)" target="_blank" rel="noopener" i18n>Open signed copy</a>
         }
         @if (canCancel(request)) {
           <button class="btn btn-sm btn-outline-danger" type="button" (click)="cancel(request)" i18n>Cancel request</button>
@@ -48,3 +83,53 @@
     <div class="list-group-item text-muted" i18n>No signature requests for this document.</div>
   }
 </div>
+
+}
+
+@if (activeView === 'signed') {
+  <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+    <div>
+      <h5 class="mb-1" i18n>Signed copies</h5>
+      <p class="small text-muted mb-0" i18n>Final signed PDFs are kept separately from the document's normal versions.</p>
+    </div>
+  </div>
+  <div class="table-responsive border rounded">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col" i18n>Signer</th>
+          <th scope="col" i18n>Source version</th>
+          <th scope="col" i18n>Requested by</th>
+          <th scope="col" i18n>Signed</th>
+          <th scope="col" class="text-end" i18n>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (signedDocument of signedDocuments(); track signedDocument.id) {
+          <tr>
+            <td class="fw-semibold">{{ signerName(signedDocument.signer) }}</td>
+            <td>
+              <span class="badge text-bg-light border">{{ sourceVersionName(signedDocument) }}</span>
+              <span class="small text-muted ms-2">#{{ signedDocument.source_version }}</span>
+            </td>
+            <td>{{ signedDocument.requester?.username }}</td>
+            <td class="text-nowrap">{{ signedDocument.created | date:'medium' }}</td>
+            <td>
+              <div class="d-flex justify-content-end gap-2">
+                <a class="btn btn-sm btn-outline-success" [href]="signedDocumentsService.fileUrl(signedDocument.id)" target="_blank" rel="noopener" i18n>View PDF</a>
+                @if (canManageSignedDocument(signedDocument)) {
+                  <button class="btn btn-sm btn-outline-secondary" type="button" (click)="editSignedDocumentPermissions(signedDocument)" i18n>Permissions</button>
+                  <button class="btn btn-sm btn-outline-danger" type="button" (click)="deleteSignedDocument(signedDocument)" i18n>Delete</button>
+                }
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="py-4 text-center text-muted" i18n>No signed copies are available to you.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

@@ -259,8 +259,10 @@ export class PermissionsSelectComponent
     action: PermissionAction
   ): boolean {
     if (
-      type === PermissionType.SignatureRequest &&
-      action === PermissionAction.Delete
+      (type === PermissionType.SignatureRequest &&
+        action === PermissionAction.Delete) ||
+      (type === PermissionType.SignedDocument &&
+        action === PermissionAction.Add)
     ) {
       return false
     }

@@ -3,7 +3,7 @@
     <ng-select name="inputId" [(ngModel)]="value"
       [disabled]="disabled"
       clearable="true"
-      [items]="users()"
+      [items]="availableUsers()"
       multiple="true"
       bindLabel="username"
       bindValue="id"

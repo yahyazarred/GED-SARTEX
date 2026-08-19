@@ -38,7 +38,7 @@
             <label class="form-label d-block my-2" i18n>Users:</label>
           </div>
           <div class="col-lg-9">
-            <pngx-permissions-user type="view" formControlName="users"></pngx-permissions-user>
+            <pngx-permissions-user type="view" formControlName="users" [excludedUserIds]="excludedUserIds"></pngx-permissions-user>
           </div>
         </div>
         <div class="row">
@@ -57,7 +57,7 @@
             <label class="form-label d-block my-2" i18n>Users:</label>
           </div>
           <div class="col-lg-9">
-            <pngx-permissions-user type="change" formControlName="users"></pngx-permissions-user>
+            <pngx-permissions-user type="change" formControlName="users" [excludedUserIds]="excludedUserIds"></pngx-permissions-user>
           </div>
         </div>
         <div class="row">

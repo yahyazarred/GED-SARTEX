@@ -1,10 +1,11 @@
-import { Injectable } from '@angular/core'
+import { Injectable, signal } from '@angular/core'
 import { Observable, Subject, tap } from 'rxjs'
 import {
   SignaturePlacement,
   SignatureProfile,
   SignatureRequest,
   SignatureUser,
+  SignedDocument,
 } from 'src/app/data/signature-request'
 import { environment } from 'src/environments/environment'
 import { AbstractPaperlessService } from './abstract-paperless-service'
@@ -18,18 +19,20 @@ export class SignatureRequestService extends AbstractPaperlessService<SignatureR
     this.resourceName = 'signature_requests'
   }
 
-  signers(): Observable<SignatureUser[]> {
-    return this.http.get<SignatureUser[]>(this.getResourceUrl(null, 'signers'))
+  signers(document: number): Observable<SignatureUser[]> {
+    return this.http.get<SignatureUser[]>(this.getResourceUrl(null, 'signers'), {
+      params: { document },
+    })
   }
 
-  requestMany(data: {
+  requestSignature(data: {
     document: number
     requested_version: number
-    signer_ids: number[]
+    signer_id: number
     message?: string
-  }): Observable<SignatureRequest[]> {
+  }): Observable<SignatureRequest> {
     return this.http
-      .post<SignatureRequest[]>(this.getResourceUrl(null, 'batch'), data)
+      .post<SignatureRequest>(this.getResourceUrl(), data)
       .pipe(tap(() => this.changed.next()))
   }
 
@@ -64,6 +67,8 @@ export class SignatureRequestService extends AbstractPaperlessService<SignatureR
 
 @Injectable({ providedIn: 'root' })
 export class SignatureProfileService extends AbstractPaperlessService<any> {
+  private readonly previewRevision = signal(Date.now())
+
   constructor() {
     super()
     this.resourceName = 'signature_profile'
@@ -76,7 +81,9 @@ export class SignatureProfileService extends AbstractPaperlessService<any> {
   upload(file: File): Observable<SignatureProfile> {
     const form = new FormData()
     form.append('signature', file)
-    return this.http.post<SignatureProfile>(this.getResourceUrl(), form)
+    return this.http
+      .post<SignatureProfile>(this.getResourceUrl(), form)
+      .pipe(tap(() => this.previewRevision.set(Date.now())))
   }
 
   fileUrl(): string {
@@ -84,6 +91,18 @@ export class SignatureProfileService extends AbstractPaperlessService<any> {
   }
 
   previewUrl(): string {
-    return `${environment.apiBaseUrl}signature_profile/preview/`
+    return `${environment.apiBaseUrl}signature_profile/preview/?revision=${this.previewRevision()}`
+  }
+}
+
+@Injectable({ providedIn: 'root' })
+export class SignedDocumentService extends AbstractPaperlessService<SignedDocument> {
+  constructor() {
+    super()
+    this.resourceName = 'signed_documents'
+  }
+
+  fileUrl(id: number): string {
+    return this.getResourceUrl(id, 'file')
   }
 }

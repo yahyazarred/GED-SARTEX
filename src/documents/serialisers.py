@@ -72,6 +72,7 @@ from documents.models import ShareLink
 from documents.models import ShareLinkBundle
 from documents.models import SignatureProfile
 from documents.models import SignatureRequest
+from documents.models import SignedDocument
 from documents.models import StoragePath
 from documents.models import Tag
 from documents.models import UiSettings
@@ -1092,6 +1093,8 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
     )
     document_title = serializers.CharField(source="document.title", read_only=True)
     source_is_latest = serializers.SerializerMethodField()
+    signed_document = serializers.SerializerMethodField()
+    signed_copy_deleted = serializers.SerializerMethodField()
 
     class Meta:
         model = SignatureRequest
@@ -1100,7 +1103,8 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
             "document",
             "document_title",
             "requested_version",
-            "signed_version",
+            "signed_document",
+            "signed_copy_deleted",
             "requester",
             "signer",
             "signer_id",
@@ -1119,7 +1123,8 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
             "source_is_latest",
         ]
         read_only_fields = [
-            "signed_version",
+            "signed_document",
+            "signed_copy_deleted",
             "status",
             "rejection_reason",
             "failure_message",
@@ -1138,6 +1143,32 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
         latest = root.versions.order_by("-version_index").first()
         return obj.requested_version_id == (latest.id if latest else root.id)
 
+    def get_signed_document(self, obj) -> int | None:
+        try:
+            signed_document = obj.signed_document
+        except SignedDocument.DoesNotExist:
+            return None
+        request = self.context.get("request")
+        user = request.user if request is not None else None
+        if user is None or not user.is_authenticated:
+            return None
+        if signed_document.signer_id == user.id or has_perms_owner_aware(
+            user,
+            "documents.view_signeddocument",
+            signed_document,
+        ):
+            return signed_document.id
+        return None
+
+    def get_signed_copy_deleted(self, obj) -> bool:
+        if obj.status != SignatureRequest.Status.SIGNED:
+            return False
+        try:
+            obj.signed_document
+        except SignedDocument.DoesNotExist:
+            return True
+        return False
+
     def validate(self, attrs):
         request = self.context.get("request")
         if request and attrs["signer"] == request.user:
@@ -1147,6 +1178,14 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
         document = attrs["document"]
         root = document.root_document or document
         requested_version = attrs["requested_version"]
+        signer = attrs["signer"]
+        if SignedDocument.objects.filter(
+            source_version=requested_version,
+            signer=signer,
+        ).exists():
+            raise serializers.ValidationError(
+                {"signer_id": "This signer has already signed this version."},
+            )
         if requested_version.id != root.id and requested_version.root_document_id != root.id:
             raise serializers.ValidationError(
                 {"requested_version": "The requested version does not belong to this document."},
@@ -1180,6 +1219,8 @@ class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
     def validate_signer_ids(self, signers):
         if not signers:
             raise serializers.ValidationError("Select at least one signer.")
+        if len(signers) != 1:
+            raise serializers.ValidationError("Select exactly one signer.")
         if len({signer.id for signer in signers}) != len(signers):
             raise serializers.ValidationError("A signer may only be selected once.")
         request = self.context.get("request")
@@ -1191,6 +1232,19 @@ class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
         document = attrs["document"]
         root = document.root_document or document
         version = attrs["requested_version"]
+        already_signed = SignedDocument.objects.filter(
+            source_version=version,
+            signer__in=attrs["signer_ids"],
+        ).values_list("signer_id", flat=True)
+        if already_signed:
+            raise serializers.ValidationError(
+                {
+                    "signer_ids": (
+                        "These signers have already signed this version: "
+                        f"{list(already_signed)}"
+                    ),
+                },
+            )
         if version.id != root.id and version.root_document_id != root.id:
             raise serializers.ValidationError(
                 {"requested_version": "The requested version does not belong to this document."},
@@ -1201,6 +1255,86 @@ class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
 
 class SignatureRejectionSerializer(serializers.Serializer[dict[str, str]]):
     reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+
+class SignedDocumentSerializer(OwnedObjectSerializer):
+    signer = BasicUserSerializer(read_only=True)
+    requester = BasicUserSerializer(read_only=True)
+    signer_name = serializers.CharField(source="signer.username", read_only=True)
+    name = serializers.SerializerMethodField()
+    source_version_index = serializers.IntegerField(
+        source="source_version.version_index",
+        read_only=True,
+        allow_null=True,
+    )
+    source_version_label = serializers.CharField(
+        source="source_version.version_label",
+        read_only=True,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = SignedDocument
+        fields = [
+            "id",
+            "document",
+            "source_version",
+            "source_version_index",
+            "source_version_label",
+            "signer",
+            "signer_name",
+            "name",
+            "requester",
+            "file_checksum",
+            "signature_checksum",
+            "created",
+            "page",
+            "x",
+            "y",
+            "width",
+            "height",
+            "owner",
+            "permissions",
+            "user_can_change",
+            "set_permissions",
+        ]
+        read_only_fields = [
+            "document",
+            "source_version",
+            "signer",
+            "requester",
+            "file_checksum",
+            "signature_checksum",
+            "created",
+            "page",
+            "x",
+            "y",
+            "width",
+            "height",
+            "owner",
+        ]
+
+    def get_name(self, obj) -> str:
+        return f"Signed by {obj.signer.username}"
+
+    def update(self, instance, validated_data):
+        permissions = validated_data.pop("set_permissions", None)
+        if permissions is not None:
+            if (
+                self.user is not None
+                and instance.owner_id != self.user.id
+                and has_perms_owner_aware(
+                    self.user,
+                    "documents.change_signeddocument",
+                    instance,
+                )
+            ):
+                protected_user = User.objects.filter(pk=self.user.pk)
+                for action in ("view", "change"):
+                    entry = permissions.setdefault(action, {})
+                    entry["users"] = entry.get("users", User.objects.none()) | protected_user
+            self._set_permissions(permissions, instance)
+        return instance
 
 
 def _get_viewable_duplicates(

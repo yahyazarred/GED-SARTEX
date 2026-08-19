@@ -9,16 +9,67 @@ import pikepdf
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from PIL import Image
+from PIL import ImageChops
+from pdf2image import convert_from_bytes
 
-from documents.data_models import ConsumableDocument
-from documents.data_models import DocumentMetadataOverrides
-from documents.data_models import DocumentSource
 from documents.models import Document
 from documents.models import SignatureProfile
-from documents.tasks import consume_file
 
 ALLOWED_SIGNATURE_MIME_TYPES = {"image/png", "image/jpeg", "application/pdf"}
 MAX_SIGNATURE_SIZE = 10 * 1024 * 1024
+
+
+def normalize_signature(data: bytes, mime_type: str) -> bytes:
+    """Return a tightly cropped PNG with near-white paper made transparent."""
+    if mime_type == "application/pdf":
+        pages = convert_from_bytes(
+            data,
+            first_page=1,
+            last_page=1,
+            dpi=200,
+            size=2000,
+            timeout=15,
+        )
+        if not pages:
+            raise ValidationError("The signature PDF has no pages.")
+        image = pages[0].convert("RGBA")
+    else:
+        with Image.open(BytesIO(data)) as source:
+            image = source.convert("RGBA")
+
+    red, green, blue, original_alpha = image.split()
+    whiteness = ImageChops.darker(ImageChops.darker(red, green), blue)
+    # Pixels at 250+ become transparent; pixels at 220 or below remain
+    # opaque. The range between them preserves antialiased pen edges.
+    alpha_curve = [
+        max(0, min(255, round((250 - value) * 255 / 30)))
+        for value in range(256)
+    ]
+    ink_alpha = whiteness.point(alpha_curve)
+    image.putalpha(ImageChops.multiply(original_alpha, ink_alpha))
+
+    alpha = image.getchannel("A")
+    bounds = alpha.getbbox()
+    if bounds is None:
+        raise ValidationError("No visible signature was found in the uploaded file.")
+    padding = max(4, round(max(image.size) * 0.01))
+    left = max(0, bounds[0] - padding)
+    top = max(0, bounds[1] - padding)
+    right = min(image.width, bounds[2] + padding)
+    bottom = min(image.height, bounds[3] + padding)
+    image = image.crop((left, top, right, bottom))
+
+    output = BytesIO()
+    image.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def normalized_signature_bytes(profile: SignatureProfile) -> bytes:
+    if profile.processed_file:
+        with profile.processed_file.open("rb") as processed_file:
+            return processed_file.read()
+    with profile.signature_file.open("rb") as signature_file:
+        return normalize_signature(signature_file.read(), profile.mime_type)
 
 
 def validate_signature_upload(upload) -> tuple[bytes, str, str]:
@@ -52,24 +103,14 @@ def signature_checksum(data: bytes) -> str:
 
 
 def _signature_as_pdf(profile: SignatureProfile, directory: Path) -> Path:
-    source = directory / Path(profile.signature_file.name).name
-    with profile.signature_file.open("rb") as signature_file:
-        source.write_bytes(signature_file.read())
-    if profile.mime_type == "application/pdf":
-        single_page = directory / "signature-page.pdf"
-        with pikepdf.open(source) as signature_pdf:
-            if not signature_pdf.pages:
-                raise ValidationError("The signature PDF has no pages.")
-            output = pikepdf.new()
-            output.pages.append(signature_pdf.pages[0])
-            output.save(single_page)
-        return single_page
+    source = directory / "signature-transparent.png"
+    source.write_bytes(normalized_signature_bytes(profile))
     converted = directory / "signature-image.pdf"
     converted.write_bytes(img2pdf.convert(str(source)))
     return converted
 
 
-def create_signed_version(
+def create_signed_document(
     *,
     source_document: Document,
     profile: SignatureProfile,
@@ -78,8 +119,7 @@ def create_signed_version(
     y: float,
     width: float,
     height: float,
-    actor_id: int,
-) -> Document:
+) -> bytes:
     for value in (x, y, width, height):
         if not 0 <= value <= 1:
             raise ValidationError("Signature placement must be within the page.")
@@ -117,30 +157,4 @@ def create_signed_version(
             page.add_overlay(signature_pdf.pages[0], rectangle)
             document_pdf.save(signed_path)
 
-        persistent_temp = Path(tempfile.mkdtemp(dir=settings.SCRATCH_DIR)) / "signed.pdf"
-        persistent_temp.write_bytes(signed_path.read_bytes())
-
-    root_document = source_document.root_document or source_document
-    overrides = DocumentMetadataOverrides(
-        version_label=f"Signed by {profile.user.get_full_name() or profile.user.username}",
-        actor_id=actor_id,
-    )
-    input_document = ConsumableDocument(
-        source=DocumentSource.ApiUpload,
-        original_file=persistent_temp,
-        root_document_id=root_document.pk,
-    )
-    try:
-        result = consume_file.apply(
-            kwargs={"input_doc": input_document, "overrides": overrides},
-        ).get()
-    finally:
-        if persistent_temp.exists():
-            persistent_temp.unlink()
-        try:
-            persistent_temp.parent.rmdir()
-        except OSError:
-            pass
-    if not result or "document_id" not in result:
-        raise ValidationError("The signed document version could not be created.")
-    return Document.objects.get(pk=result["document_id"])
+        return signed_path.read_bytes()

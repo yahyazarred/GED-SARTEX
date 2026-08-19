@@ -10,7 +10,6 @@ from collections import deque
 from datetime import datetime
 from datetime import timedelta
 from http import HTTPStatus
-from io import BytesIO
 from pathlib import Path
 from time import mktime
 from time import sleep
@@ -171,6 +170,7 @@ from documents.models import ShareLink
 from documents.models import ShareLinkBundle
 from documents.models import SignatureProfile
 from documents.models import SignatureRequest
+from documents.models import SignedDocument
 from documents.models import StoragePath
 from documents.models import Tag
 from documents.models import UiSettings
@@ -226,6 +226,7 @@ from documents.serialisers import SignatureProfileSerializer
 from documents.serialisers import SignatureRejectionSerializer
 from documents.serialisers import SignatureRequestBatchSerializer
 from documents.serialisers import SignatureRequestSerializer
+from documents.serialisers import SignedDocumentSerializer
 from documents.serialisers import StoragePathSerializer
 from documents.serialisers import StoragePathTestSerializer
 from documents.serialisers import TagSerializer
@@ -238,7 +239,9 @@ from documents.serialisers import WorkflowActionSerializer
 from documents.serialisers import WorkflowSerializer
 from documents.serialisers import WorkflowTriggerSerializer
 from documents.signals import document_updated
-from documents.signatures import create_signed_version
+from documents.signatures import create_signed_document
+from documents.signatures import normalize_signature
+from documents.signatures import normalized_signature_bytes
 from documents.signatures import signature_checksum
 from documents.signatures import validate_signature_upload
 from documents.tasks import build_share_link_bundle
@@ -324,6 +327,60 @@ def _notify_signature_request(signature_request: SignatureRequest) -> None:
         logger.warning("Unable to send signature request update", exc_info=True)
 
 
+def _log_signature_event(
+    signature_request: SignatureRequest,
+    event: str,
+    actor: User,
+    *,
+    details: str = "",
+) -> None:
+    if not settings.AUDIT_LOG_ENABLED:
+        return
+    root_document = signature_request.document.root_document or signature_request.document
+    description = f"{signature_request.signer.username} (request {signature_request.pk})"
+    changes = {event: ["None", description]}
+    if details:
+        changes["Details"] = ["None", details]
+    LogEntry.objects.log_create(
+        instance=root_document,
+        changes=changes,
+        action=LogEntry.Action.UPDATE,
+        actor=actor,
+        additional_data={
+            "signature_request_id": signature_request.pk,
+            "signature_event": event,
+            "signer_id": signature_request.signer_id,
+        },
+    )
+
+
+def _delete_signed_documents(queryset, actor: User) -> None:
+    for signed_document in queryset.select_related(
+        "signature_request__document",
+        "signature_request__signer",
+    ):
+        _log_signature_event(
+            signed_document.signature_request,
+            "Signed Copy Deleted",
+            actor,
+        )
+        storage = signed_document.signed_file.storage
+        file_name = signed_document.signed_file.name
+        signed_document.delete()
+        if file_name:
+            def delete_file(storage=storage, file_name=file_name):
+                try:
+                    storage.delete(file_name)
+                except Exception:
+                    logger.warning(
+                        "Unable to delete signed copy file %s",
+                        file_name,
+                        exc_info=True,
+                    )
+
+            transaction.on_commit(delete_file)
+
+
 class SignatureProfileViewSet(ViewSet):
     permission_classes = (IsAuthenticated,)
     parser_classes = (parsers.MultiPartParser, parsers.FormParser)
@@ -342,6 +399,7 @@ class SignatureProfileViewSet(ViewSet):
             raise ValidationError({"signature": "A signature file is required."})
         try:
             data, mime_type, extension = validate_signature_upload(upload)
+            processed_data = normalize_signature(data, mime_type)
         except DjangoValidationError as error:
             raise ValidationError({"signature": error.messages}) from error
         profile, _ = SignatureProfile.objects.get_or_create(
@@ -354,10 +412,17 @@ class SignatureProfileViewSet(ViewSet):
         )
         if profile.signature_file:
             profile.signature_file.delete(save=False)
+        if profile.processed_file:
+            profile.processed_file.delete(save=False)
         profile.original_filename = upload.name
         profile.mime_type = mime_type
         profile.checksum = signature_checksum(data)
         profile.signature_file.save(f"signature{extension}", ContentFile(data), save=False)
+        profile.processed_file.save(
+            "signature-transparent.png",
+            ContentFile(processed_data),
+            save=False,
+        )
         profile.save()
         return Response(SignatureProfileSerializer(profile).data, status=status.HTTP_200_OK)
 
@@ -372,34 +437,22 @@ class SignatureProfileViewSet(ViewSet):
     @action(detail=False, methods=["get"])
     def preview(self, request):
         profile = get_object_or_404(SignatureProfile, user=request.user)
-        with profile.signature_file.open("rb") as signature_file:
-            data = signature_file.read()
-        if profile.mime_type == "application/pdf":
-            from pdf2image import convert_from_bytes
-
-            images = convert_from_bytes(
-                data,
-                first_page=1,
-                last_page=1,
-                dpi=150,
-                size=1200,
-                timeout=15,
+        data = normalized_signature_bytes(profile)
+        if not profile.processed_file:
+            profile.processed_file.save(
+                "signature-transparent.png",
+                ContentFile(data),
+                save=True,
             )
-            if not images:
-                raise NotFound("The signature PDF has no pages.")
-            output = BytesIO()
-            images[0].save(output, format="PNG")
-            data = output.getvalue()
-            content_type = "image/png"
-        else:
-            content_type = profile.mime_type
-        response = HttpResponse(data, content_type=content_type)
+        response = HttpResponse(data, content_type="image/png")
         response["Cache-Control"] = "private, no-store"
         return response
 
     def destroy(self, request, pk=None):
         profile = get_object_or_404(SignatureProfile, user=request.user)
         profile.signature_file.delete(save=False)
+        if profile.processed_file:
+            profile.processed_file.delete(save=False)
         profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -419,7 +472,6 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
         queryset = SignatureRequest.objects.select_related(
             "document",
             "requested_version",
-            "signed_version",
             "requester",
             "signer",
         )
@@ -449,6 +501,11 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
         document = serializer.validated_data["document"]
         if not has_perms_owner_aware(request.user, "view_document", document):
             raise PermissionDenied("You cannot view this document.")
+        signer = serializer.validated_data["signer"]
+        if not has_perms_owner_aware(signer, "view_document", document):
+            raise ValidationError(
+                {"signer_id": "This signer cannot view the document."},
+            )
         try:
             with transaction.atomic():
                 instance = serializer.save(requester=request.user)
@@ -457,6 +514,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
                 {"signer_id": "A signature from this signer is already pending for this version."},
             ) from error
         _notify_signature_request(instance)
+        _log_signature_event(instance, "Signature Requested", request.user)
         return Response(
             self.get_serializer(instance).data,
             status=status.HTTP_201_CREATED,
@@ -474,10 +532,21 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     def signers(self, request):
         if not request.user.has_perm("documents.add_signaturerequest"):
             raise PermissionDenied("You do not have permission to request signatures.")
+        document_id = request.query_params.get("document")
+        if not document_id:
+            raise ValidationError({"document": "A document is required."})
+        document = get_object_or_404(Document, pk=document_id)
+        if not has_perms_owner_aware(request.user, "view_document", document):
+            raise PermissionDenied("You cannot view this document.")
         users = User.objects.filter(
             is_active=True,
             groups__built_in_identity__key="signers",
         ).exclude(pk=request.user.pk).order_by(Lower("username"))
+        users = [
+            user
+            for user in users
+            if has_perms_owner_aware(user, "view_document", document)
+        ]
         return Response(
             BasicUserSerializer(users, many=True).data,
         )
@@ -496,6 +565,24 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             raise PermissionDenied("You cannot view this document.")
         version = serializer.validated_data["requested_version"]
         signers = serializer.validated_data["signer_ids"]
+        signer = signers[0]
+        if not has_perms_owner_aware(signer, "view_document", document):
+            raise ValidationError(
+                {"signer_ids": "This signer cannot view the document."},
+            )
+        signed_signers = SignedDocument.objects.filter(
+            source_version=version,
+            signer__in=signers,
+        ).values_list("signer_id", flat=True)
+        if signed_signers:
+            raise ValidationError(
+                {
+                    "signer_ids": (
+                        "These signers have already signed this version: "
+                        f"{list(signed_signers)}"
+                    ),
+                },
+            )
         existing = SignatureRequest.objects.filter(
             document=document,
             requested_version=version,
@@ -525,6 +612,11 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             raise ValidationError("One or more signature requests are already active.") from error
         for signature_request in created:
             _notify_signature_request(signature_request)
+            _log_signature_event(
+                signature_request,
+                "Signature Requested",
+                request.user,
+            )
         return Response(
             SignatureRequestSerializer(created, many=True).data,
             status=status.HTTP_201_CREATED,
@@ -546,6 +638,12 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             locked.completed = timezone.now()
             locked.save(update_fields=["status", "rejection_reason", "completed"])
         _notify_signature_request(locked)
+        _log_signature_event(
+            locked,
+            "Signature Rejected",
+            request.user,
+            details=locked.rejection_reason,
+        )
         return Response(self.get_serializer(locked).data)
 
     @action(detail=True, methods=["get"], url_path="document")
@@ -584,6 +682,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             locked.completed = timezone.now()
             locked.save(update_fields=["status", "completed"])
         _notify_signature_request(locked)
+        _log_signature_event(locked, "Signature Request Cancelled", request.user)
         return Response(self.get_serializer(locked).data)
 
     @action(detail=True, methods=["post"])
@@ -605,16 +704,20 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
                 raise ValidationError(
                     f"This request cannot be signed while its status is {locked.status}.",
                 )
+            if SignedDocument.objects.filter(
+                source_version=locked.requested_version,
+                signer=locked.signer,
+            ).exists():
+                raise ValidationError("You have already signed this document version.")
             locked.status = SignatureRequest.Status.PROCESSING
             locked.failure_message = ""
             locked.completed = None
             locked.save(update_fields=["status", "failure_message", "completed"])
         try:
             placement_data = placement.validated_data
-            signed_version = create_signed_version(
+            signed_data = create_signed_document(
                 source_document=locked.requested_version,
                 profile=profile,
-                actor_id=request.user.id,
                 page_number=placement_data["page"],
                 x=placement_data["x"],
                 y=placement_data["y"],
@@ -632,20 +735,126 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             )
             locked.refresh_from_db()
             _notify_signature_request(locked)
+            _log_signature_event(
+                locked,
+                "Signature Failed",
+                request.user,
+                details=locked.failure_message,
+            )
             raise ValidationError(str(error)) from error
         with transaction.atomic():
             locked = SignatureRequest.objects.select_for_update().get(pk=signature_request.pk)
             if locked.status != SignatureRequest.Status.PROCESSING:
                 raise ValidationError("This request is no longer being processed.")
+            signed_document = SignedDocument(
+                signature_request=locked,
+                document=locked.document,
+                source_version=locked.requested_version,
+                signer=locked.signer,
+                requester=locked.requester,
+                owner=locked.requester,
+                file_checksum=signature_checksum(signed_data),
+                signature_checksum=profile.checksum,
+                **placement.validated_data,
+            )
+            signed_document.signed_file.save(
+                "signed.pdf",
+                ContentFile(signed_data),
+                save=False,
+            )
+            try:
+                signed_document.save()
+            except Exception:
+                signed_document.signed_file.delete(save=False)
+                raise
+            set_permissions_for_object(
+                {"view": {"users": [locked.signer_id], "groups": []}},
+                signed_document,
+                merge=True,
+            )
             locked.status = SignatureRequest.Status.SIGNED
-            locked.signed_version = signed_version
             locked.signature_checksum = profile.checksum
             locked.completed = timezone.now()
             for field, value in placement.validated_data.items():
                 setattr(locked, field, value)
             locked.save()
         _notify_signature_request(locked)
+        _log_signature_event(locked, "Document Signed", request.user)
         return Response(self.get_serializer(locked).data)
+
+
+class SignedDocumentViewSet(ModelViewSet[SignedDocument]):
+    serializer_class = SignedDocumentSerializer
+    permission_classes = (IsAuthenticated,)
+    pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filterset_fields = ("document", "source_version", "signer", "requester")
+    ordering_fields = ("created", "signer")
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs.setdefault("user", self.request.user)
+        kwargs.setdefault("full_perms", True)
+        return super().get_serializer(*args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = SignedDocument.objects.select_related(
+            "document",
+            "source_version",
+            "signer",
+            "requester",
+            "owner",
+            "signature_request",
+        )
+        if user.is_superuser:
+            return queryset
+        permitted = get_objects_for_user_owner_aware(
+            user,
+            "documents.view_signeddocument",
+            SignedDocument,
+        )
+        return (permitted | queryset.filter(signer=user)).distinct()
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not has_perms_owner_aware(
+            request.user,
+            "documents.change_signeddocument",
+            instance,
+        ):
+            raise PermissionDenied("You cannot change this signed copy.")
+        return super().partial_update(request, *args, **kwargs)
+
+    @action(detail=True, methods=["get"])
+    def file(self, request, pk=None):
+        signed_document = self.get_object()
+        response = FileResponse(
+            signed_document.signed_file.open("rb"),
+            content_type="application/pdf",
+        )
+        response["Content-Disposition"] = 'inline; filename="signed-document.pdf"'
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        signed_document = self.get_object()
+        can_delete = has_perms_owner_aware(
+            request.user,
+            "documents.delete_signeddocument",
+            signed_document,
+        ) or has_perms_owner_aware(
+            request.user,
+            "documents.change_signeddocument",
+            signed_document,
+        )
+        if not can_delete:
+            raise PermissionDenied("You cannot delete this signed copy.")
+        _delete_signed_documents(
+            SignedDocument.objects.filter(pk=signed_document.pk),
+            request.user,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def _get_tantivy_query_and_mode(params):
@@ -1678,9 +1887,22 @@ class DocumentViewSet(
     def destroy(self, request, *args, **kwargs):
         from documents.search import get_backend
 
-        get_backend().remove(self.get_object().pk)
+        document = self.get_object()
+        signed_documents = SignedDocument.objects.filter(
+            Q(document=document)
+            | Q(source_version=document)
+            | Q(source_version__root_document=document),
+        )
+        get_backend().remove(document.pk)
         try:
-            return super().destroy(request, *args, **kwargs)
+            with transaction.atomic():
+                _delete_signed_documents(signed_documents, request.user)
+                SignatureRequest.objects.filter(
+                    Q(document=document)
+                    | Q(requested_version=document)
+                    | Q(requested_version__root_document=document),
+                ).delete()
+                return super().destroy(request, *args, **kwargs)
         except Exception as e:
             if "Data too long for column" in str(e):
                 logger.warning(
@@ -2520,18 +2742,16 @@ class DocumentViewSet(
 
         version_doc = self._get_version_doc_for_root(root_doc, version_id)
 
-        if (
-            hasattr(version_doc, "completed_signature_request")
-            and not request.user.is_superuser
-        ):
-            raise PermissionDenied(
-                "Signed versions can only be deleted by a superuser.",
-            )
-
         if version_doc.id == root_doc.id:
             return HttpResponseBadRequest(
                 "Cannot delete the root/original version. Delete the document instead.",
             )
+
+        _delete_signed_documents(
+            SignedDocument.objects.filter(source_version=version_doc),
+            request.user,
+        )
+        SignatureRequest.objects.filter(requested_version=version_doc).delete()
 
         from documents.search import get_backend
 
@@ -5737,7 +5957,7 @@ class TrashView(ListModelMixin, PassUserMixin):
 
     model = Document
 
-    queryset = Document.deleted_objects.all()
+    queryset = Document.deleted_objects.filter(root_document__isnull=True)
 
     def get(self, request: Request, format: str | None = None) -> Response:
         self.serializer_class = DocumentSerializer

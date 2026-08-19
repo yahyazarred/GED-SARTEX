@@ -1,0 +1,45 @@
+.signer-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+  max-height: 15rem;
+  padding: 0.5rem;
+  overflow-y: auto;
+  border: var(--bs-border-width) solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.signer-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  color: var(--bs-body-color);
+  background: var(--bs-body-bg);
+  border: var(--bs-border-width) solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.signer-option:hover,
+.signer-option.selected {
+  border-color: var(--bs-primary);
+}
+
+.signer-option.selected {
+  box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.15);
+}
+
+.signer-avatar {
+  display: grid;
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  color: var(--bs-primary-text-emphasis);
+  font-weight: 600;
+  background: var(--bs-primary-bg-subtle);
+  border-radius: 50%;
+}

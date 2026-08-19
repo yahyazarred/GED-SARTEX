@@ -26,6 +26,7 @@ import {
 import {
   SignatureProfileService,
   SignatureRequestService,
+  SignedDocumentService,
 } from 'src/app/services/rest/signature-request.service'
 import { SettingsService } from 'src/app/services/settings.service'
 import { ToastService } from 'src/app/services/toast.service'
@@ -52,6 +53,7 @@ import { SignatureRejectionDialogComponent } from './signature-rejection-dialog.
 export class ParapheurComponent implements OnInit {
   private readonly requestsService = inject(SignatureRequestService)
   readonly profileService = inject(SignatureProfileService)
+  readonly signedDocumentsService = inject(SignedDocumentService)
   private readonly settings = inject(SettingsService)
   private readonly toast = inject(ToastService)
   private readonly modal = inject(NgbModal)

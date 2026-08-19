@@ -59,6 +59,9 @@ export class PermissionsFormComponent
   @Input()
   accordion: boolean = false
 
+  @Input()
+  excludedUserIds: number[] = []
+
   form = new FormGroup({
     owner: new FormControl(null),
     set_permissions: new FormGroup({

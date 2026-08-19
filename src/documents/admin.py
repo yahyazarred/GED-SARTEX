@@ -16,6 +16,7 @@ from documents.models import SavedViewFilterRule
 from documents.models import ShareLink
 from documents.models import ShareLinkBundle
 from documents.models import SignatureRequest
+from documents.models import SignedDocument
 from documents.models import StoragePath
 from documents.models import Tag
 from documents.tasks import update_document_parent_tags
@@ -258,6 +259,16 @@ class SignatureRequestAdmin(admin.ModelAdmin):
         return False
 
 
+class SignedDocumentAdmin(GuardedModelAdmin):
+    list_display = ("id", "document", "source_version", "signer", "requester", "created")
+    list_filter = ("created",)
+    search_fields = ("document__title", "signer__username", "requester__username")
+    readonly_fields = tuple(field.name for field in SignedDocument._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+
 admin.site.register(Correspondent, CorrespondentAdmin)
 admin.site.register(Tag, TagAdmin)
 admin.site.register(DocumentType, DocumentTypeAdmin)
@@ -272,6 +283,7 @@ admin.site.register(ShareLinkBundle, ShareLinkBundleAdmin)
 admin.site.register(CustomField, CustomFieldsAdmin)
 admin.site.register(CustomFieldInstance, CustomFieldInstancesAdmin)
 admin.site.register(SignatureRequest, SignatureRequestAdmin)
+admin.site.register(SignedDocument, SignedDocumentAdmin)
 
 if settings.AUDIT_LOG_ENABLED:
 

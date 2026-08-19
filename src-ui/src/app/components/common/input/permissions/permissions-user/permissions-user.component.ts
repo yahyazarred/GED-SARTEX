@@ -1,4 +1,4 @@
-import { Component, forwardRef, inject } from '@angular/core'
+import { Component, forwardRef, inject, Input } from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import {
   FormsModule,
@@ -25,9 +25,17 @@ import { AbstractInputComponent } from '../../abstract-input'
   imports: [NgSelectComponent, FormsModule, ReactiveFormsModule],
 })
 export class PermissionsUserComponent extends AbstractInputComponent<User[]> {
+  @Input()
+  excludedUserIds: number[] = []
+
   private readonly userService = inject(UserService)
   readonly users = toSignal(
     this.userService.listAll().pipe(map((result) => result.results)),
     { initialValue: undefined as User[] }
   )
+  availableUsers(): User[] {
+    return (this.users() ?? []).filter(
+      (user) => !this.excludedUserIds.includes(user.id)
+    )
+  }
 }

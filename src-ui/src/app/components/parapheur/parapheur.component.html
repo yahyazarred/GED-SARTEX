@@ -73,8 +73,19 @@
             @if (request.status === SignatureRequestStatus.Failed && request.failure_message) {
               <div class="small text-danger mt-1">{{ request.failure_message }}</div>
             }
+            @if (request.signed_copy_deleted) {
+              <div><span class="badge text-bg-danger mt-1" i18n>Signed copy deleted</span></div>
+            }
           </div>
-          <span class="badge text-bg-secondary">{{ request.status }}</span>
+          <span class="badge"
+            [class.text-bg-warning]="request.status === SignatureRequestStatus.Pending"
+            [class.text-bg-success]="request.status === SignatureRequestStatus.Signed"
+            [class.text-bg-danger]="request.status === SignatureRequestStatus.Rejected || request.status === SignatureRequestStatus.Failed"
+            [class.text-bg-secondary]="request.status === SignatureRequestStatus.Cancelled"
+            [class.text-bg-info]="request.status === SignatureRequestStatus.Processing">{{ request.status }}</span>
+          @if (request.signed_document) {
+            <a class="btn btn-sm btn-outline-success" [href]="signedDocumentsService.fileUrl(request.signed_document)" target="_blank" rel="noopener" i18n>Open signed copy</a>
+          }
           @if (request.status === SignatureRequestStatus.Pending) {
             <button class="btn btn-sm btn-outline-danger" type="button" (click)="reject(request)" i18n>Reject</button>
           }

@@ -25,6 +25,8 @@ from documents.models import CustomFieldInstance
 from documents.models import Document
 from documents.models import DocumentType
 from documents.models import PaperlessTask
+from documents.models import SignatureRequest
+from documents.models import SignedDocument
 from documents.models import StoragePath
 from documents.models import Tag
 from documents.permissions import set_permissions_for_object
@@ -385,15 +387,26 @@ def modify_custom_fields(
     return "OK"
 
 
+def _delete_signed_file(storage, file_name: str) -> None:
+    try:
+        storage.delete(file_name)
+    except Exception:
+        logger.warning(
+            "Unable to delete signed copy file %s",
+            file_name,
+            exc_info=True,
+        )
+
+
 @shared_task
 def delete(doc_ids: list[int]) -> Literal["OK"]:
     try:
-        root_ids = (
+        root_ids = list(
             Document.objects.filter(id__in=doc_ids, root_document__isnull=True)
             .values_list("id", flat=True)
             .distinct()
         )
-        version_ids = (
+        version_ids = list(
             Document.objects.filter(root_document_id__in=root_ids)
             .exclude(id__in=doc_ids)
             .values_list("id", flat=True)
@@ -401,7 +414,32 @@ def delete(doc_ids: list[int]) -> Literal["OK"]:
         )
         delete_ids = list({*doc_ids, *version_ids})
 
-        Document.objects.filter(id__in=delete_ids).delete()
+        with transaction.atomic():
+            signed_documents = list(
+                SignedDocument.objects.filter(
+                    Q(document_id__in=root_ids) | Q(source_version_id__in=delete_ids),
+                ),
+            )
+            signed_files = [
+                (signed_document.signed_file.storage, signed_document.signed_file.name)
+                for signed_document in signed_documents
+                if signed_document.signed_file.name
+            ]
+            SignedDocument.objects.filter(
+                pk__in=[signed_document.pk for signed_document in signed_documents],
+            ).delete()
+            SignatureRequest.objects.filter(
+                Q(document_id__in=root_ids) | Q(requested_version_id__in=delete_ids),
+            ).delete()
+            Document.objects.filter(id__in=delete_ids).delete()
+
+            for storage, file_name in signed_files:
+                transaction.on_commit(
+                    lambda storage=storage, file_name=file_name: _delete_signed_file(
+                        storage,
+                        file_name,
+                    ),
+                )
 
         from documents.search import get_backend
 
