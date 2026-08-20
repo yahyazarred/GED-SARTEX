@@ -30,7 +30,7 @@
           <span class="badge" [class.text-bg-warning]="task.status === CircuitTaskStatus.Pending"
             [class.text-bg-success]="task.status === CircuitTaskStatus.Approved"
             [class.text-bg-danger]="task.status === CircuitTaskStatus.Rejected"
-            [class.text-bg-secondary]="task.status === CircuitTaskStatus.Cancelled">{{ task.status }}</span>
+            [class.text-bg-secondary]="task.status === CircuitTaskStatus.Cancelled">{{ workflowStatusName(task.status) }}</span>
         </div>
         @if (task.status === CircuitTaskStatus.Pending) {
           <div class="d-flex justify-content-end gap-2 mt-3">

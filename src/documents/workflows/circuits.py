@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Max
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from guardian.shortcuts import assign_perm
 from guardian.shortcuts import remove_perm
 
@@ -261,7 +262,7 @@ def start_circuit(
     actor: User | None = None,
 ) -> CircuitRun:
     if not workflow.is_circuit:
-        raise ValueError("Only stateful workflows can be started as circuits.")
+        raise ValueError(_("Only stateful workflows can be started."))
     document = document.root_document or document
     first_step = (
         workflow.steps.filter(
@@ -351,7 +352,7 @@ def advance_circuit(run_id: int) -> CircuitRun:
                         else list(step.approval_group.user_set.filter(is_active=True))
                     )
                     if not users:
-                        raise ValueError("The approval step has no active approvers.")
+                        raise ValueError(_("The approval step has no active approvers."))
                     attempt = (
                         CircuitTask.objects.filter(run=run, step=step).aggregate(
                             maximum=Max("attempt"),
@@ -377,16 +378,16 @@ def advance_circuit(run_id: int) -> CircuitRun:
                     if not signer.groups.filter(
                         built_in_identity__key="signers",
                     ).exists():
-                        raise ValueError("The configured user is not an active signer.")
+                        raise ValueError(_("The configured user is not an active signer."))
                     if not signer.has_perm("documents.view_document", run.document):
                         raise PermissionDenied(
-                            "The configured signer cannot view this document.",
+                            _("The configured signer cannot view this document."),
                         )
                     requester = run.started_by or run.document.owner
                     if requester is None:
                         requester = User.objects.filter(is_superuser=True, is_active=True).first()
                     if requester is None:
-                        raise ValueError("No user is available to own the signature request.")
+                        raise ValueError(_("No user is available to own the signature request."))
                     requested_version = run.document.versions.order_by(
                         "-version_index",
                         "-pk",
@@ -397,7 +398,7 @@ def advance_circuit(run_id: int) -> CircuitRun:
                         signer=signer,
                     ).exists():
                         raise ValueError(
-                            "The configured signer has already signed this document version.",
+                            _("The configured signer has already signed this document version."),
                         )
                     signature_request = SignatureRequest.objects.create(
                         document=run.document,
@@ -454,11 +455,11 @@ def advance_circuit(run_id: int) -> CircuitRun:
 
 def decide_task(task: CircuitTask, user: User, approved: bool, comment: str = "") -> CircuitRun:
     if task.assigned_to_id != user.pk:
-        raise PermissionDenied("This approval task is assigned to another user.")
+        raise PermissionDenied(_("This approval task is assigned to another user."))
     if task.status != CircuitTask.Status.PENDING:
-        raise ValueError("Only pending approval tasks can be decided.")
+        raise ValueError(_("Only pending approval tasks can be decided."))
     if not approved and not comment.strip():
-        raise ValueError("A rejection reason is required.")
+        raise ValueError(_("A rejection reason is required."))
 
     with transaction.atomic():
         task = CircuitTask.objects.select_for_update().select_related(

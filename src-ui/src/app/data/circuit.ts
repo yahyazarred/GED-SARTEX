@@ -16,6 +16,33 @@ export enum CircuitTaskStatus {
   Cancelled = 'cancelled',
 }
 
+export function workflowStatusName(status: string): string {
+  const names: Record<string, string> = {
+    running: $localize`:@@workflowStatusRunning:Running`,
+    waiting: $localize`:@@workflowStatusWaiting:Waiting`,
+    completed: $localize`:@@workflowStatusCompleted:Completed`,
+    pending: $localize`:@@workflowStatusPending:Pending`,
+    approved: $localize`:@@workflowStatusApproved:Approved`,
+    rejected: $localize`:@@workflowStatusRejected:Rejected`,
+    cancelled: $localize`:@@workflowStatusCancelled:Cancelled`,
+    failed: $localize`:@@workflowStatusFailed:Failed`,
+    not_started: $localize`:@@workflowStatusNotStarted:Not started`,
+    succeeded: $localize`:@@workflowStatusSucceeded:Succeeded`,
+    skipped: $localize`:@@workflowStatusSkipped:Skipped`,
+  }
+  return names[status] ?? status
+}
+
+export function workflowStepTypeName(type: WorkflowStepType): string {
+  const names: Record<WorkflowStepType, string> = {
+    action: $localize`:@@workflowStepTypeAction:Action`,
+    approval: $localize`:@@workflowStepTypeApproval:Approval`,
+    signature: $localize`:@@workflowStepTypeSignature:Signature request`,
+    matching: $localize`:@@workflowStepTypeMatching:Automatic matching`,
+  }
+  return names[type]
+}
+
 export interface CircuitTask extends ObjectWithId {
   run: number
   step: number

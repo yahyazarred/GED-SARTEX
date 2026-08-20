@@ -9,8 +9,8 @@
       <div class="list-group-item p-0">
         <div class="d-flex align-items-center gap-2 p-3">
           <button class="btn btn-sm btn-link text-body p-1" type="button" (click)="toggleRun(run)" [attr.aria-expanded]="expandedRuns().has(run.id)" aria-label="Show workflow steps" i18n-aria-label><i-bs [name]="expandedRuns().has(run.id) ? 'chevron-down' : 'chevron-right'"></i-bs></button>
-          <div class="flex-grow-1"><strong>{{ run.workflow_name }}</strong> · @if (run.document) { <a [routerLink]="['/documents', run.document]">{{ run.document_title }}</a> } @else { <span>{{ run.document_title || 'Document in trash' }}</span> }<div class="small text-muted">{{ run.current_step_name || 'Finished' }} · {{ run.started | date:'medium' }}</div>@if (run.failure_message) { <div class="small text-danger">{{ run.failure_message }}</div> }</div>
-          <span class="badge" [class.text-bg-info]="run.status === CircuitStatus.Running" [class.text-bg-warning]="run.status === CircuitStatus.Waiting" [class.text-bg-success]="run.status === CircuitStatus.Completed" [class.text-bg-danger]="run.status === CircuitStatus.Rejected || run.status === CircuitStatus.Failed" [class.text-bg-secondary]="run.status === CircuitStatus.Cancelled">{{ run.status }}</span>
+          <div class="flex-grow-1"><strong>{{ run.workflow_name }}</strong> · @if (run.document) { <a [routerLink]="['/documents', run.document]">{{ run.document_title }}</a> } @else { <span>{{ run.document_title }} <ng-container i18n>Document in trash</ng-container></span> }<div class="small text-muted">@if (run.current_step_name) { {{ run.current_step_name }} } @else { <ng-container i18n>Finished</ng-container> } · {{ run.started | date:'medium' }}</div>@if (run.failure_message) { <div class="small text-danger">{{ run.failure_message }}</div> }</div>
+          <span class="badge" [class.text-bg-info]="run.status === CircuitStatus.Running" [class.text-bg-warning]="run.status === CircuitStatus.Waiting" [class.text-bg-success]="run.status === CircuitStatus.Completed" [class.text-bg-danger]="run.status === CircuitStatus.Rejected || run.status === CircuitStatus.Failed" [class.text-bg-secondary]="run.status === CircuitStatus.Cancelled">{{ workflowStatusName(run.status) }}</span>
           @if (canManage && (run.status === CircuitStatus.Running || run.status === CircuitStatus.Waiting)) { <button class="btn btn-sm btn-outline-danger" type="button" (click)="cancel(run)" i18n>Cancel</button> }
           @if (canManage && (run.status === CircuitStatus.Running || run.status === CircuitStatus.Waiting)) { <button class="btn btn-sm btn-outline-secondary" type="button" (click)="manage(run, 'skip')" i18n>Skip</button> }
           @if (canManage) { <button class="btn btn-sm btn-outline-secondary" type="button" (click)="manage(run, 'restart')" i18n>Restart</button> }
@@ -20,17 +20,17 @@
             <div class="d-flex flex-wrap gap-2 mb-3">
               @for (step of mainSteps(run); track step.id) {
                 <button class="btn text-start border" style="min-width: 9rem" type="button" (click)="selectStep(run, step)" [class.shadow]="selectedSteps()[run.id] === step.id" [class.btn-success]="step.status === 'succeeded'" [class.btn-danger]="step.status === 'failed' || step.status === 'rejected'" [class.btn-warning]="step.status === 'waiting'" [class.btn-info]="step.status === 'running'" [class.btn-secondary]="step.status === 'skipped' || step.status === 'cancelled'" [class.btn-light]="step.status === 'not_started'">
-                  <strong>{{ step.display_number }}</strong><span class="d-block small">{{ step.name }}</span><span class="d-block small text-capitalize">{{ step.status.replace('_', ' ') }}</span>
+                  <strong>{{ step.display_number }}</strong><span class="d-block small">{{ step.name }}</span><span class="d-block small">{{ workflowStatusName(step.status) }}</span>
                 </button>
               }
             </div>
             @for (parent of branchParents(run); track parent) {
               <div class="ms-4 mb-3 ps-3 border-start border-3 border-danger">
-                <div class="small fw-semibold text-danger mb-2"><i-bs name="arrow-return-right" class="me-1"></i-bs><ng-container i18n>Rejection path from step {{ parent }}</ng-container></div>
+                <div class="small fw-semibold text-danger mb-2"><i-bs name="arrow-return-right" class="me-1"></i-bs><ng-container i18n="@@workflowRejectionPathFromStep">Rejection path from step {{ parent }}</ng-container></div>
                 <div class="d-flex flex-wrap gap-2">
                   @for (step of branchSteps(run, parent); track step.id) {
                     <button class="btn text-start border" style="min-width: 9rem" type="button" (click)="selectStep(run, step)" [class.shadow]="selectedSteps()[run.id] === step.id" [class.btn-success]="step.status === 'succeeded'" [class.btn-danger]="step.status === 'failed' || step.status === 'rejected'" [class.btn-warning]="step.status === 'waiting'" [class.btn-info]="step.status === 'running'" [class.btn-secondary]="step.status === 'skipped' || step.status === 'cancelled'" [class.btn-light]="step.status === 'not_started'">
-                      <strong>{{ step.display_number }}</strong><span class="d-block small">{{ step.name }}</span><span class="d-block small text-capitalize">{{ step.status.replace('_', ' ') }}</span>
+                      <strong>{{ step.display_number }}</strong><span class="d-block small">{{ step.name }}</span><span class="d-block small">{{ workflowStatusName(step.status) }}</span>
                     </button>
                   }
                 </div>
@@ -38,12 +38,12 @@
             }
             @if (selectedStep(run); as step) {
               <div class="card"><div class="card-body">
-                <h6 class="card-title">{{ step.display_number }}. {{ step.name }} <span class="badge text-bg-secondary ms-1">{{ step.type }}</span></h6>
+                <h6 class="card-title">{{ step.display_number }}. {{ step.name }} <span class="badge text-bg-secondary ms-1">{{ workflowStepTypeName(step.type) }}</span></h6>
                 @for (execution of step.executions; track execution.id) {
-                  <div class="border-top pt-2 mt-2"><strong i18n>Attempt {{ execution.attempt }}</strong> · <span class="text-capitalize">{{ execution.status }}</span><div class="small text-muted">{{ execution.started | date:'medium' }}@if (execution.completed) { — {{ execution.completed | date:'medium' }} }@if (execution.actor_username) { · {{ execution.actor_username }} }</div>@if (execution.detail) { <div class="mt-1"><strong i18n>Details:</strong> {{ execution.detail }}</div> }@if (execution.error) { <div class="alert alert-danger py-2 mt-2 mb-0"><strong i18n>Error:</strong> {{ execution.error }}</div> }</div>
+                  <div class="border-top pt-2 mt-2"><strong i18n="@@workflowAttempt">Attempt {{ execution.attempt }}</strong> · <span>{{ workflowStatusName(execution.status) }}</span><div class="small text-muted">{{ execution.started | date:'medium' }}@if (execution.completed) { — {{ execution.completed | date:'medium' }} }@if (execution.actor_username) { · {{ execution.actor_username }} }</div>@if (execution.detail) { <div class="mt-1"><strong i18n>Details:</strong> {{ execution.detail }}</div> }@if (execution.error) { <div class="alert alert-danger py-2 mt-2 mb-0"><strong i18n>Error:</strong> {{ execution.error }}</div> }</div>
                 }
-                @for (task of step.approval_tasks; track task.id) { <div class="border-top pt-2 mt-2"><strong i18n>Approval:</strong> {{ task.assigned_to }} · {{ task.status }}@if (task.decided_by) { <span i18n> by {{ task.decided_by }}</span> }@if (task.comment) { <div><strong i18n>Message:</strong> {{ task.comment }}</div> }</div> }
-                @for (request of step.signature_requests; track request.id) { <div class="border-top pt-2 mt-2"><strong i18n>Signature:</strong> {{ request.signer }} · {{ request.status }}@if (request.rejection_reason) { <div><strong i18n>Rejection message:</strong> {{ request.rejection_reason }}</div> }@if (request.failure_message) { <div class="text-danger"><strong i18n>Error:</strong> {{ request.failure_message }}</div> }</div> }
+                @for (task of step.approval_tasks; track task.id) { <div class="border-top pt-2 mt-2"><strong i18n>Approval:</strong> {{ task.assigned_to }} · {{ workflowStatusName(task.status) }}@if (task.decided_by) { <span i18n="@@workflowDecidedBy"> by {{ task.decided_by }}</span> }@if (task.comment) { <div><strong i18n>Message:</strong> {{ task.comment }}</div> }</div> }
+                @for (request of step.signature_requests; track request.id) { <div class="border-top pt-2 mt-2"><strong i18n>Signature:</strong> {{ request.signer }} · {{ workflowStatusName(request.status) }}@if (request.rejection_reason) { <div><strong i18n>Rejection message:</strong> {{ request.rejection_reason }}</div> }@if (request.failure_message) { <div class="text-danger"><strong i18n>Error:</strong> {{ request.failure_message }}</div> }</div> }
                 @if (!step.executions.length && !step.approval_tasks.length && !step.signature_requests.length) { <div class="text-muted" i18n>This step has not started yet.</div> }
               </div></div>
             }

@@ -14,7 +14,7 @@ import { ToastService } from 'src/app/services/toast.service'
       <button class="btn-close" type="button" (click)="modal.dismiss()"></button>
     </div>
     <div class="modal-body">
-      <p i18n>Start “{{ workflow.name }}” for a document.</p>
+      <p i18n="@@workflowStartForDocument">Start “{{ workflow.name }}” for a document.</p>
       <label class="form-label" for="circuit-document-id" i18n>Document ID</label>
       <input
         id="circuit-document-id"

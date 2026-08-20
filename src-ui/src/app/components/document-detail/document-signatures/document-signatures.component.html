@@ -61,10 +61,10 @@
           [class.text-bg-warning]="request.status === SignatureRequestStatus.Pending"
           [class.text-bg-success]="request.status === SignatureRequestStatus.Signed"
           [class.text-bg-danger]="request.status === SignatureRequestStatus.Rejected || request.status === SignatureRequestStatus.Failed"
-          [class.text-bg-secondary]="request.status === SignatureRequestStatus.Cancelled">{{ request.status }}</span>
+          [class.text-bg-secondary]="request.status === SignatureRequestStatus.Cancelled">{{ signatureRequestStatusName(request.status) }}</span>
         <span class="small text-muted ms-auto">{{ request.created | date:'medium' }}</span>
       </div>
-      <div class="small text-muted" i18n>Requested by {{ request.requester?.username }}</div>
+      <div class="small text-muted" i18n="@@signatureRequestedBy">Requested by {{ request.requester?.username }}</div>
       @if (request.message) { <div class="mt-2">{{ request.message }}</div> }
       @if (request.rejection_reason) { <div class="mt-2 text-danger">{{ request.rejection_reason }}</div> }
       @if (request.signed_copy_deleted) {

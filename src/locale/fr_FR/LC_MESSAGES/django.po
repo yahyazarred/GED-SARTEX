@@ -2407,3 +2407,183 @@ msgstr "état"
 msgid "error"
 msgstr "erreur"
 
+
+#: GED-SARTEX feature localization
+msgid "You cannot request your own signature."
+msgstr "Vous ne pouvez pas demander votre propre signature."
+
+#: GED-SARTEX feature localization
+msgid "This signer has already signed this version."
+msgstr "Ce signataire a déjà signé cette version."
+
+#: GED-SARTEX feature localization
+msgid "The requested version does not belong to this document."
+msgstr "La version demandée n’appartient pas à ce document."
+
+#: GED-SARTEX feature localization
+msgid "Signature placement must be within the page."
+msgstr "La signature doit être placée à l’intérieur de la page."
+
+#: GED-SARTEX feature localization
+msgid "Select at least one signer."
+msgstr "Sélectionnez au moins un signataire."
+
+#: GED-SARTEX feature localization
+msgid "Select exactly one signer."
+msgstr "Sélectionnez exactement un signataire."
+
+#: GED-SARTEX feature localization
+msgid "A signer may only be selected once."
+msgstr "Un signataire ne peut être sélectionné qu’une seule fois."
+
+#: GED-SARTEX feature localization
+msgid "These signers have already signed this version: %(ids)s"
+msgstr "Ces signataires ont déjà signé cette version : %(ids)s"
+
+#: GED-SARTEX feature localization
+msgid "Only stateful workflows can be started."
+msgstr "Seuls les workflows avec état peuvent être démarrés."
+
+#: GED-SARTEX feature localization
+msgid "The approval step has no active approvers."
+msgstr "L’étape d’approbation ne comporte aucun approbateur actif."
+
+#: GED-SARTEX feature localization
+msgid "The configured user is not an active signer."
+msgstr "L’utilisateur configuré n’est pas un signataire actif."
+
+#: GED-SARTEX feature localization
+msgid "The configured signer cannot view this document."
+msgstr "Le signataire configuré ne peut pas consulter ce document."
+
+#: GED-SARTEX feature localization
+msgid "No user is available to own the signature request."
+msgstr "Aucun utilisateur n’est disponible pour être propriétaire de la demande de signature."
+
+#: GED-SARTEX feature localization
+msgid "The configured signer has already signed this document version."
+msgstr "Le signataire configuré a déjà signé cette version du document."
+
+#: GED-SARTEX feature localization
+msgid "This approval task is assigned to another user."
+msgstr "Cette tâche d’approbation est attribuée à un autre utilisateur."
+
+#: GED-SARTEX feature localization
+msgid "Only pending approval tasks can be decided."
+msgstr "Seules les tâches d’approbation en attente peuvent faire l’objet d’une décision."
+
+#: GED-SARTEX feature localization
+msgid "A rejection reason is required."
+msgstr "Un motif de rejet est obligatoire."
+
+#: GED-SARTEX feature localization
+msgid "Only signers can configure a signature."
+msgstr "Seuls les signataires peuvent configurer une signature."
+
+#: GED-SARTEX feature localization
+msgid "A signature file is required."
+msgstr "Un fichier de signature est obligatoire."
+
+#: GED-SARTEX feature localization
+msgid "You do not have permission to request signatures."
+msgstr "Vous n’avez pas l’autorisation de demander des signatures."
+
+#: GED-SARTEX feature localization
+msgid "You cannot view this document."
+msgstr "Vous ne pouvez pas consulter ce document."
+
+#: GED-SARTEX feature localization
+msgid "This signer cannot view the document."
+msgstr "Ce signataire ne peut pas consulter le document."
+
+#: GED-SARTEX feature localization
+msgid "A signature from this signer is already pending for this version."
+msgstr "Une demande de signature de ce signataire est déjà en attente pour cette version."
+
+#: GED-SARTEX feature localization
+msgid "A document is required."
+msgstr "Un document est obligatoire."
+
+#: GED-SARTEX feature localization
+msgid "One or more signature requests are already active."
+msgstr "Une ou plusieurs demandes de signature sont déjà actives."
+
+#: GED-SARTEX feature localization
+msgid "Only the assigned signer can reject this request."
+msgstr "Seul le signataire désigné peut rejeter cette demande."
+
+#: GED-SARTEX feature localization
+msgid "Only pending requests can be rejected."
+msgstr "Seules les demandes en attente peuvent être rejetées."
+
+#: GED-SARTEX feature localization
+msgid "Only the assigned signer can open this requested version."
+msgstr "Seul le signataire désigné peut ouvrir cette version demandée."
+
+#: GED-SARTEX feature localization
+msgid "You cannot cancel this request."
+msgstr "Vous ne pouvez pas annuler cette demande."
+
+#: GED-SARTEX feature localization
+msgid "Only pending requests can be cancelled."
+msgstr "Seules les demandes en attente peuvent être annulées."
+
+#: GED-SARTEX feature localization
+msgid "Only the assigned signer can sign this request."
+msgstr "Seul le signataire désigné peut signer cette demande."
+
+#: GED-SARTEX feature localization
+msgid "You have already signed this document version."
+msgstr "Vous avez déjà signé cette version du document."
+
+#: GED-SARTEX feature localization
+msgid "This request is no longer being processed."
+msgstr "Cette demande n’est plus en cours de traitement."
+
+#: GED-SARTEX feature localization
+msgid "You cannot change this signed copy."
+msgstr "Vous ne pouvez pas modifier cette copie signée."
+
+#: GED-SARTEX feature localization
+msgid "You cannot delete this signed copy."
+msgstr "Vous ne pouvez pas supprimer cette copie signée."
+
+#: GED-SARTEX feature localization
+msgid "You cannot view this workflow."
+msgstr "Vous ne pouvez pas consulter ce workflow."
+
+#: GED-SARTEX feature localization
+msgid "You cannot start document workflows."
+msgstr "Vous ne pouvez pas démarrer les workflows de documents."
+
+#: GED-SARTEX feature localization
+msgid "Only stateful workflows can be started manually."
+msgstr "Seuls les workflows avec état peuvent être démarrés manuellement."
+
+#: GED-SARTEX feature localization
+msgid "Approval tasks are created by the workflow engine."
+msgstr "Les tâches d’approbation sont créées par le moteur de workflow."
+
+#: GED-SARTEX feature localization
+msgid "Start workflows through the workflow start action."
+msgstr "Démarrez les workflows à l’aide de l’action de démarrage."
+
+#: GED-SARTEX feature localization
+msgid "You cannot manage workflow activity."
+msgstr "Vous ne pouvez pas gérer l’activité des workflows."
+
+#: GED-SARTEX feature localization
+msgid "Only active workflows can be cancelled."
+msgstr "Seuls les workflows actifs peuvent être annulés."
+
+#: GED-SARTEX feature localization
+msgid "A reason is required when restarting a workflow."
+msgstr "Un motif est obligatoire pour redémarrer un workflow."
+
+#: GED-SARTEX feature localization
+msgid "A reason is required when skipping a step."
+msgstr "Un motif est obligatoire pour ignorer une étape."
+
+#: GED-SARTEX feature localization
+msgid "This workflow has no current step."
+msgstr "Ce workflow ne comporte aucune étape actuelle."

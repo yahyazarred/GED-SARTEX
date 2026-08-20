@@ -1195,7 +1195,7 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
         request = self.context.get("request")
         if request and attrs["signer"] == request.user:
             raise serializers.ValidationError(
-                {"signer_id": "You cannot request your own signature."},
+                {"signer_id": _("You cannot request your own signature.")},
             )
         document = attrs["document"]
         root = document.root_document or document
@@ -1206,11 +1206,11 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
             signer=signer,
         ).exists():
             raise serializers.ValidationError(
-                {"signer_id": "This signer has already signed this version."},
+                {"signer_id": _("This signer has already signed this version.")},
             )
         if requested_version.id != root.id and requested_version.root_document_id != root.id:
             raise serializers.ValidationError(
-                {"requested_version": "The requested version does not belong to this document."},
+                {"requested_version": _("The requested version does not belong to this document.")},
             )
         attrs["document"] = root
         return attrs
@@ -1225,7 +1225,7 @@ class SignaturePlacementSerializer(serializers.Serializer[dict[str, Any]]):
 
     def validate(self, attrs):
         if attrs["x"] + attrs["width"] > 1 or attrs["y"] + attrs["height"] > 1:
-            raise serializers.ValidationError("Signature placement must be within the page.")
+            raise serializers.ValidationError(_("Signature placement must be within the page."))
         return attrs
 
 
@@ -1240,14 +1240,14 @@ class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
 
     def validate_signer_ids(self, signers):
         if not signers:
-            raise serializers.ValidationError("Select at least one signer.")
+            raise serializers.ValidationError(_("Select at least one signer."))
         if len(signers) != 1:
-            raise serializers.ValidationError("Select exactly one signer.")
+            raise serializers.ValidationError(_("Select exactly one signer."))
         if len({signer.id for signer in signers}) != len(signers):
-            raise serializers.ValidationError("A signer may only be selected once.")
+            raise serializers.ValidationError(_("A signer may only be selected once."))
         request = self.context.get("request")
         if request and request.user in signers:
-            raise serializers.ValidationError("You cannot request your own signature.")
+            raise serializers.ValidationError(_("You cannot request your own signature."))
         return signers
 
     def validate(self, attrs):
@@ -1262,14 +1262,14 @@ class SignatureRequestBatchSerializer(serializers.Serializer[dict[str, Any]]):
             raise serializers.ValidationError(
                 {
                     "signer_ids": (
-                        "These signers have already signed this version: "
-                        f"{list(already_signed)}"
+                        _("These signers have already signed this version: %(ids)s")
+                        % {"ids": list(already_signed)}
                     ),
                 },
             )
         if version.id != root.id and version.root_document_id != root.id:
             raise serializers.ValidationError(
-                {"requested_version": "The requested version does not belong to this document."},
+                {"requested_version": _("The requested version does not belong to this document.")},
             )
         attrs["document"] = root
         return attrs

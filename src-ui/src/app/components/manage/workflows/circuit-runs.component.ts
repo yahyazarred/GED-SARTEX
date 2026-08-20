@@ -9,6 +9,8 @@ import {
   CircuitRun,
   CircuitStepSummary,
   CircuitStatus,
+  workflowStatusName,
+  workflowStepTypeName,
 } from 'src/app/data/circuit'
 import { CircuitRunService } from 'src/app/services/rest/circuit.service'
 import { ToastService } from 'src/app/services/toast.service'
@@ -44,6 +46,8 @@ export class CircuitRunsComponent implements OnInit {
   readonly runs = signal<CircuitRun[]>([])
   readonly loading = signal(false)
   readonly CircuitStatus = CircuitStatus
+  readonly workflowStatusName = workflowStatusName
+  readonly workflowStepTypeName = workflowStepTypeName
   readonly PermissionAction = PermissionAction
   readonly PermissionType = PermissionType
   readonly expandedRuns = signal<Set<number>>(new Set())

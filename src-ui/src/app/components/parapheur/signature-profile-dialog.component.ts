@@ -32,7 +32,10 @@ import { ToastService } from 'src/app/services/toast.service'
         </div>
         <div class="small text-muted mb-3">{{ profile().original_filename }}</div>
       }
-      <label class="form-label" for="signatureFile" i18n>{{ profile()?.configured ? 'Replace signature' : 'Upload signature' }}</label>
+      <label class="form-label" for="signatureFile">
+        @if (profile()?.configured) { <ng-container i18n>Replace signature</ng-container> }
+        @else { <ng-container i18n>Upload signature</ng-container> }
+      </label>
       <input id="signatureFile" class="form-control" type="file" accept="image/png,image/jpeg,application/pdf" (change)="selected($event)" />
       <div class="form-text" i18n>PNG, JPEG or a one-page PDF, up to 10 MB.</div>
     </div>

@@ -400,10 +400,10 @@ class SignatureProfileViewSet(ViewSet):
 
     def create(self, request):
         if not _is_signer(request.user):
-            raise PermissionDenied("Only signers can configure a signature.")
+            raise PermissionDenied(_("Only signers can configure a signature."))
         upload = request.FILES.get("signature")
         if upload is None:
-            raise ValidationError({"signature": "A signature file is required."})
+            raise ValidationError({"signature": _("A signature file is required.")})
         try:
             data, mime_type, extension = validate_signature_upload(upload)
             processed_data = normalize_signature(data, mime_type)
@@ -502,23 +502,23 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
 
     def create(self, request, *args, **kwargs):
         if not request.user.has_perm("documents.add_signaturerequest"):
-            raise PermissionDenied("You do not have permission to request signatures.")
+            raise PermissionDenied(_("You do not have permission to request signatures."))
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         document = serializer.validated_data["document"]
         if not has_perms_owner_aware(request.user, "view_document", document):
-            raise PermissionDenied("You cannot view this document.")
+            raise PermissionDenied(_("You cannot view this document."))
         signer = serializer.validated_data["signer"]
         if not has_perms_owner_aware(signer, "view_document", document):
             raise ValidationError(
-                {"signer_id": "This signer cannot view the document."},
+                {"signer_id": _("This signer cannot view the document.")},
             )
         try:
             with transaction.atomic():
                 instance = serializer.save(requester=request.user)
         except IntegrityError as error:
             raise ValidationError(
-                {"signer_id": "A signature from this signer is already pending for this version."},
+                {"signer_id": _("A signature from this signer is already pending for this version.")},
             ) from error
         _notify_signature_request(instance)
         _log_signature_event(instance, "Signature Requested", request.user)
@@ -538,13 +538,13 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     @action(detail=False, methods=["get"])
     def signers(self, request):
         if not request.user.has_perm("documents.add_signaturerequest"):
-            raise PermissionDenied("You do not have permission to request signatures.")
+            raise PermissionDenied(_("You do not have permission to request signatures."))
         document_id = request.query_params.get("document")
         if not document_id:
-            raise ValidationError({"document": "A document is required."})
+            raise ValidationError({"document": _("A document is required.")})
         document = get_object_or_404(Document, pk=document_id)
         if not has_perms_owner_aware(request.user, "view_document", document):
-            raise PermissionDenied("You cannot view this document.")
+            raise PermissionDenied(_("You cannot view this document."))
         users = User.objects.filter(
             is_active=True,
             groups__built_in_identity__key="signers",
@@ -561,7 +561,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     @action(detail=False, methods=["post"], url_path="batch")
     def batch_create(self, request):
         if not request.user.has_perm("documents.add_signaturerequest"):
-            raise PermissionDenied("You do not have permission to request signatures.")
+            raise PermissionDenied(_("You do not have permission to request signatures."))
         serializer = SignatureRequestBatchSerializer(
             data=request.data,
             context=self.get_serializer_context(),
@@ -569,13 +569,13 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
         serializer.is_valid(raise_exception=True)
         document = serializer.validated_data["document"]
         if not has_perms_owner_aware(request.user, "view_document", document):
-            raise PermissionDenied("You cannot view this document.")
+            raise PermissionDenied(_("You cannot view this document."))
         version = serializer.validated_data["requested_version"]
         signers = serializer.validated_data["signer_ids"]
         signer = signers[0]
         if not has_perms_owner_aware(signer, "view_document", document):
             raise ValidationError(
-                {"signer_ids": "This signer cannot view the document."},
+                {"signer_ids": _("This signer cannot view the document.")},
             )
         signed_signers = SignedDocument.objects.filter(
             source_version=version,
@@ -616,7 +616,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
                     for signer in signers
                 ]
         except IntegrityError as error:
-            raise ValidationError("One or more signature requests are already active.") from error
+            raise ValidationError(_("One or more signature requests are already active.")) from error
         for signature_request in created:
             _notify_signature_request(signature_request)
             _log_signature_event(
@@ -633,13 +633,13 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     def reject(self, request, pk=None):
         signature_request = self.get_object()
         if signature_request.signer_id != request.user.id or not _is_signer(request.user):
-            raise PermissionDenied("Only the assigned signer can reject this request.")
+            raise PermissionDenied(_("Only the assigned signer can reject this request."))
         serializer = SignatureRejectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             locked = SignatureRequest.objects.select_for_update().get(pk=signature_request.pk)
             if locked.status != SignatureRequest.Status.PENDING:
-                raise ValidationError("Only pending requests can be rejected.")
+                raise ValidationError(_("Only pending requests can be rejected."))
             locked.status = SignatureRequest.Status.REJECTED
             locked.rejection_reason = serializer.validated_data.get("reason", "")
             locked.completed = timezone.now()
@@ -660,7 +660,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     def requested_document(self, request, pk=None):
         signature_request = self.get_object()
         if signature_request.signer_id != request.user.id or not _is_signer(request.user):
-            raise PermissionDenied("Only the assigned signer can open this requested version.")
+            raise PermissionDenied(_("Only the assigned signer can open this requested version."))
         document = signature_request.requested_version
         path = document.archive_path if document.has_archive_version else document.source_path
         if path is None or magic.from_file(path, mime=True) != "application/pdf":
@@ -683,11 +683,11 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             or request.user.has_perm("documents.change_signaturerequest")
         )
         if not allowed:
-            raise PermissionDenied("You cannot cancel this request.")
+            raise PermissionDenied(_("You cannot cancel this request."))
         with transaction.atomic():
             locked = SignatureRequest.objects.select_for_update().get(pk=signature_request.pk)
             if locked.status != SignatureRequest.Status.PENDING:
-                raise ValidationError("Only pending requests can be cancelled.")
+                raise ValidationError(_("Only pending requests can be cancelled."))
             locked.status = SignatureRequest.Status.CANCELLED
             locked.completed = timezone.now()
             locked.save(update_fields=["status", "completed"])
@@ -702,7 +702,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
     def sign(self, request, pk=None):
         signature_request = self.get_object()
         if signature_request.signer_id != request.user.id or not _is_signer(request.user):
-            raise PermissionDenied("Only the assigned signer can sign this request.")
+            raise PermissionDenied(_("Only the assigned signer can sign this request."))
         placement = SignaturePlacementSerializer(data=request.data)
         placement.is_valid(raise_exception=True)
         profile = get_object_or_404(SignatureProfile, user=request.user)
@@ -721,7 +721,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
                 source_version=locked.requested_version,
                 signer=locked.signer,
             ).exists():
-                raise ValidationError("You have already signed this document version.")
+                raise ValidationError(_("You have already signed this document version."))
             locked.status = SignatureRequest.Status.PROCESSING
             locked.failure_message = ""
             locked.completed = None
@@ -761,7 +761,7 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
         with transaction.atomic():
             locked = SignatureRequest.objects.select_for_update().get(pk=signature_request.pk)
             if locked.status != SignatureRequest.Status.PROCESSING:
-                raise ValidationError("This request is no longer being processed.")
+                raise ValidationError(_("This request is no longer being processed."))
             signed_document = SignedDocument(
                 signature_request=locked,
                 document=locked.document,
@@ -842,7 +842,7 @@ class SignedDocumentViewSet(ModelViewSet[SignedDocument]):
             "documents.change_signeddocument",
             instance,
         ):
-            raise PermissionDenied("You cannot change this signed copy.")
+            raise PermissionDenied(_("You cannot change this signed copy."))
         return super().partial_update(request, *args, **kwargs)
 
     @action(detail=True, methods=["get"])
@@ -868,7 +868,7 @@ class SignedDocumentViewSet(ModelViewSet[SignedDocument]):
             signed_document,
         )
         if not can_delete:
-            raise PermissionDenied("You cannot delete this signed copy.")
+            raise PermissionDenied(_("You cannot delete this signed copy."))
         _delete_signed_documents(
             SignedDocument.objects.filter(pk=signed_document.pk),
             request.user,
@@ -5624,18 +5624,18 @@ class WorkflowViewSet(ModelViewSet[Workflow]):
             request.user.is_superuser
             or request.user.has_perm("documents.view_workflow")
         ):
-            raise PermissionDenied("You cannot view this workflow.")
+            raise PermissionDenied(_("You cannot view this workflow."))
         workflow = self.get_object()
         if not (
             request.user.is_superuser
             or request.user.has_perm("documents.add_circuitrun")
         ):
-            raise PermissionDenied("You cannot start document workflows.")
+            raise PermissionDenied(_("You cannot start document workflows."))
         if not workflow.is_circuit:
-            raise ValidationError("Only stateful workflows can be started manually.")
+            raise ValidationError(_("Only stateful workflows can be started manually."))
         document = get_object_or_404(Document, pk=request.data.get("document"))
         if not has_perms_owner_aware(request.user, "view_document", document):
-            raise PermissionDenied("You cannot view this document.")
+            raise PermissionDenied(_("You cannot view this document."))
         from documents.workflows.circuits import start_circuit
 
         try:
@@ -5686,7 +5686,7 @@ class CircuitTaskViewSet(ModelViewSet[CircuitTask]):
     ordering_fields = ("created", "completed", "status")
 
     def create(self, request, *args, **kwargs):
-        raise ValidationError("Approval tasks are created by the workflow engine.")
+        raise ValidationError(_("Approval tasks are created by the workflow engine."))
 
     def get_queryset(self):
         queryset = CircuitTask.objects.select_related(
@@ -5737,7 +5737,7 @@ class CircuitRunViewSet(ModelViewSet[CircuitRun]):
     ordering_fields = ("started", "modified", "completed", "status")
 
     def create(self, request, *args, **kwargs):
-        raise ValidationError("Start workflows through the workflow start action.")
+        raise ValidationError(_("Start workflows through the workflow start action."))
 
     def get_queryset(self):
         queryset = CircuitRun.objects.select_related(
@@ -5786,14 +5786,14 @@ class CircuitRunViewSet(ModelViewSet[CircuitRun]):
             request.user.is_superuser
             or request.user.has_perm("documents.change_circuitrun")
         ):
-            raise PermissionDenied("You cannot manage workflow activity.")
+            raise PermissionDenied(_("You cannot manage workflow activity."))
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         self._require_manager(request)
         run = self.get_object()
         if run.status not in (CircuitRun.Status.RUNNING, CircuitRun.Status.WAITING):
-            raise ValidationError("Only active workflows can be cancelled.")
+            raise ValidationError(_("Only active workflows can be cancelled."))
         from documents.workflows.circuits import _revoke_task_access
         from documents.workflows.circuits import notify_circuit_task
 
@@ -5849,7 +5849,7 @@ class CircuitRunViewSet(ModelViewSet[CircuitRun]):
         step = get_object_or_404(run.workflow.steps, pk=request.data.get("step"))
         reason = str(request.data.get("reason", "")).strip()
         if not reason:
-            raise ValidationError("A reason is required when restarting a workflow.")
+            raise ValidationError(_("A reason is required when restarting a workflow."))
         from documents.workflows.circuits import _revoke_task_access
         from documents.workflows.circuits import advance_circuit
         from documents.workflows.circuits import notify_circuit_task
@@ -5914,10 +5914,10 @@ class CircuitRunViewSet(ModelViewSet[CircuitRun]):
         self._require_manager(request)
         reason = str(request.data.get("reason", "")).strip()
         if not reason:
-            raise ValidationError("A reason is required when skipping a step.")
+            raise ValidationError(_("A reason is required when skipping a step."))
         run = self.get_object()
         if not run.current_step_id:
-            raise ValidationError("This run has no current step.")
+            raise ValidationError(_("This workflow has no current step."))
         from documents.workflows.circuits import _next_step
         from documents.workflows.circuits import advance_circuit
         from documents.workflows.circuits import _revoke_task_access

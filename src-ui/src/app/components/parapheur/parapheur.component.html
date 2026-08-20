@@ -1,11 +1,11 @@
-<pngx-page-header title="Parapheur" i18n-title info="Review and sign documents assigned to you." i18n-info>
+<pngx-page-header title="Signature Requests" i18n-title="@@signatureRequestsTitle" info="Review and sign documents assigned to you." i18n-info>
   <button class="btn btn-sm btn-outline-primary" type="button" (click)="editSignature()">
     <i-bs name="pen" class="me-1"></i-bs><ng-container i18n>My signature</ng-container>
   </button>
 </pngx-page-header>
 
 @if (!isSigner) {
-  <div class="alert alert-danger" i18n>You must belong to the built-in Signers group to access Parapheur.</div>
+  <div class="alert alert-danger" i18n>You must belong to the built-in Signers group to access Signature Requests.</div>
 } @else if (selected()) {
   <div class="d-flex align-items-center gap-2 mb-3">
     <button class="btn btn-sm btn-outline-secondary" type="button" (click)="selected.set(null)" i18n>Back</button>
@@ -13,7 +13,7 @@
     @if (!selected().source_is_latest) {
       <span class="badge text-bg-warning" i18n>This request targets an older version</span>
     }
-    <span class="ms-auto" i18n>Page {{ page }} of {{ pageCount }}</span>
+    <span class="ms-auto" i18n="@@signaturePageCount">Page {{ page }} of {{ pageCount }}</span>
     <button class="btn btn-sm btn-outline-secondary" type="button" (click)="previousPage()" [disabled]="page <= 1" i18n>Previous</button>
     <button class="btn btn-sm btn-outline-secondary" type="button" (click)="nextPage()" [disabled]="page >= pageCount" i18n>Next</button>
   </div>
@@ -72,7 +72,7 @@
               <span class="badge text-bg-secondary ms-2" i18n>Document in trash</span>
             }
             <div class="small text-muted">
-              <span i18n>Requested by {{ request.requester?.username }}</span> · {{ request.created | date:'medium' }}
+              <span i18n="@@signatureRequestedBy">Requested by {{ request.requester?.username }}</span> · {{ request.created | date:'medium' }}
             </div>
             @if (request.message) { <div class="small mt-1">{{ request.message }}</div> }
             @if (request.status === SignatureRequestStatus.Failed && request.failure_message) {
@@ -87,7 +87,7 @@
             [class.text-bg-success]="request.status === SignatureRequestStatus.Signed"
             [class.text-bg-danger]="request.status === SignatureRequestStatus.Rejected || request.status === SignatureRequestStatus.Failed"
             [class.text-bg-secondary]="request.status === SignatureRequestStatus.Cancelled"
-            [class.text-bg-info]="request.status === SignatureRequestStatus.Processing">{{ request.status }}</span>
+            [class.text-bg-info]="request.status === SignatureRequestStatus.Processing">{{ signatureRequestStatusName(request.status) }}</span>
           @if (request.signed_document) {
             <a class="btn btn-sm btn-outline-success" [href]="signedDocumentsService.fileUrl(request.signed_document)" target="_blank" rel="noopener" i18n>Open signed copy</a>
           }

@@ -12974,6 +12974,559 @@
         </context-group>
         <target state="final">Terminer</target>
       </trans-unit>
+      <trans-unit id="signatureRequestsTitle" datatype="html" approved="yes">
+        <source>Signature Requests</source>
+        <target state="final">Parapheur</target>
+      </trans-unit>
+      <trans-unit id="signatureRequestsNav" datatype="html" approved="yes">
+        <source>Signature Requests</source>
+        <target state="final">Parapheur</target>
+      </trans-unit>
+      <trans-unit id="signatureStatusPending" datatype="html" approved="yes"><source>Pending</source><target state="final">En attente</target></trans-unit>
+      <trans-unit id="signatureStatusProcessing" datatype="html" approved="yes"><source>Processing</source><target state="final">En cours</target></trans-unit>
+      <trans-unit id="signatureStatusSigned" datatype="html" approved="yes"><source>Signed</source><target state="final">Signé</target></trans-unit>
+      <trans-unit id="signatureStatusRejected" datatype="html" approved="yes"><source>Rejected</source><target state="final">Rejeté</target></trans-unit>
+      <trans-unit id="signatureStatusCancelled" datatype="html" approved="yes"><source>Cancelled</source><target state="final">Annulé</target></trans-unit>
+      <trans-unit id="signatureStatusFailed" datatype="html" approved="yes"><source>Failed</source><target state="final">Échec</target></trans-unit>
+      <trans-unit id="workflowStatusRunning" datatype="html" approved="yes"><source>Running</source><target state="final">En cours</target></trans-unit>
+      <trans-unit id="workflowStatusWaiting" datatype="html" approved="yes"><source>Waiting</source><target state="final">En attente</target></trans-unit>
+      <trans-unit id="workflowStatusCompleted" datatype="html" approved="yes"><source>Completed</source><target state="final">Terminé</target></trans-unit>
+      <trans-unit id="workflowStatusPending" datatype="html" approved="yes"><source>Pending</source><target state="final">En attente</target></trans-unit>
+      <trans-unit id="workflowStatusApproved" datatype="html" approved="yes"><source>Approved</source><target state="final">Approuvé</target></trans-unit>
+      <trans-unit id="workflowStatusRejected" datatype="html" approved="yes"><source>Rejected</source><target state="final">Rejeté</target></trans-unit>
+      <trans-unit id="workflowStatusCancelled" datatype="html" approved="yes"><source>Cancelled</source><target state="final">Annulé</target></trans-unit>
+      <trans-unit id="workflowStatusFailed" datatype="html" approved="yes"><source>Failed</source><target state="final">Échec</target></trans-unit>
+      <trans-unit id="workflowStatusNotStarted" datatype="html" approved="yes"><source>Not started</source><target state="final">Non démarré</target></trans-unit>
+      <trans-unit id="workflowStatusSucceeded" datatype="html" approved="yes"><source>Succeeded</source><target state="final">Réussi</target></trans-unit>
+      <trans-unit id="workflowStatusSkipped" datatype="html" approved="yes"><source>Skipped</source><target state="final">Ignoré</target></trans-unit>
+      <trans-unit id="workflowStepTypeAction" datatype="html" approved="yes"><source>Action</source><target state="final">Action</target></trans-unit>
+      <trans-unit id="workflowStepTypeApproval" datatype="html" approved="yes"><source>Approval</source><target state="final">Approbation</target></trans-unit>
+      <trans-unit id="63679568923579290" datatype="html" approved="yes">
+        <source>Approval</source>
+        <target state="final">Approbation</target>
+      </trans-unit>
+      <trans-unit id="2755233396453268060" datatype="html" approved="yes">
+        <source>Approval requirement</source>
+        <target state="final">Condition d’approbation</target>
+      </trans-unit>
+      <trans-unit id="workflowStepTypeSignature" datatype="html" approved="yes"><source>Signature request</source><target state="final">Demande de signature</target></trans-unit>
+      <trans-unit id="workflowStepTypeMatching" datatype="html" approved="yes"><source>Automatic matching</source><target state="final">Correspondance automatique</target></trans-unit>
+      <trans-unit id="1923661305688635797" datatype="html" approved="yes">
+        <source>A group</source>
+        <target state="final">Un groupe</target>
+      </trans-unit>
+      <trans-unit id="8949955411433526130" datatype="html" approved="yes">
+        <source>A user</source>
+        <target state="final">Un utilisateur</target>
+      </trans-unit>
+      <trans-unit id="5442351361093511017" datatype="html" approved="yes">
+        <source>Access to the source document does not grant access to this signed copy.</source>
+        <target state="final">L’accès au document source ne donne pas accès à cette copie signée.</target>
+      </trans-unit>
+      <trans-unit id="1693830356758086188" datatype="html" approved="yes">
+        <source>Add rejection action</source>
+        <target state="final">Ajouter une action de rejet</target>
+      </trans-unit>
+      <trans-unit id="3947348681953463500" datatype="html" approved="yes">
+        <source>All matching metadata</source>
+        <target state="final">Toutes les métadonnées correspondantes</target>
+      </trans-unit>
+      <trans-unit id="294307327473504059" datatype="html" approved="yes">
+        <source>All members approve</source>
+        <target state="final">Tous les membres approuvent</target>
+      </trans-unit>
+      <trans-unit id="4551006451537993722" datatype="html" approved="yes">
+        <source>All requests</source>
+        <target state="final">Toutes les demandes</target>
+      </trans-unit>
+      <trans-unit id="5355345801871981482" datatype="html" approved="yes">
+        <source>All statuses</source>
+        <target state="final">Tous les statuts</target>
+      </trans-unit>
+      <trans-unit id="6032284119684448967" datatype="html" approved="yes">
+        <source>All tasks</source>
+        <target state="final">Toutes les tâches</target>
+      </trans-unit>
+      <trans-unit id="4846741133654782352" datatype="html" approved="yes">
+        <source>Approval recorded.</source>
+        <target state="final">Approbation enregistrée.</target>
+      </trans-unit>
+      <trans-unit id="5356346342594597137" datatype="html" approved="yes">
+        <source>Approval:</source>
+        <target state="final">Approbation :</target>
+      </trans-unit>
+      <trans-unit id="3821661153451769620" datatype="html" approved="yes">
+        <source>Approve</source>
+        <target state="final">Approuver</target>
+      </trans-unit>
+      <trans-unit id="9132090010779524433" datatype="html" approved="yes">
+        <source>Available signers</source>
+        <target state="final">Signataires disponibles</target>
+      </trans-unit>
+      <trans-unit id="8890553633144307762" datatype="html" approved="yes">
+        <source>Back</source>
+        <target state="final">Retour</target>
+      </trans-unit>
+      <trans-unit id="6293869498720079480" datatype="html" approved="yes">
+        <source>Back to workflows</source>
+        <target state="final">Retour aux workflows</target>
+      </trans-unit>
+      <trans-unit id="6464966950526295300" datatype="html" approved="yes">
+        <source>Belongs to any of these cabinets</source>
+        <target state="final">Appartient à l’un de ces cabinets</target>
+      </trans-unit>
+      <trans-unit id="3569713085806161602" datatype="html" approved="yes">
+        <source>Belongs to cabinet</source>
+        <target state="final">Appartient au cabinet</target>
+      </trans-unit>
+      <trans-unit id="1784018774882696279" datatype="html" approved="yes">
+        <source>cabinet</source>
+        <target state="final">cabinet</target>
+      </trans-unit>
+      <trans-unit id="5859883623209950985" datatype="html" approved="yes">
+        <source>Cabinet only</source>
+        <target state="final">Cabinet uniquement</target>
+      </trans-unit>
+      <trans-unit id="6123107350672887120" datatype="html" approved="yes">
+        <source>cabinets</source>
+        <target state="final">cabinets</target>
+      </trans-unit>
+      <trans-unit id="6207697803784242615" datatype="html" approved="yes">
+        <source>Cancel request</source>
+        <target state="final">Annuler la demande</target>
+      </trans-unit>
+      <trans-unit id="699324120827275496" datatype="html" approved="yes">
+        <source>Choose signers</source>
+        <target state="final">Choisir un signataire</target>
+      </trans-unit>
+      <trans-unit id="8598451120823785208" datatype="html" approved="yes">
+        <source>Complete the custom field query configuration.</source>
+        <target state="final">Terminez la configuration de la requête de champ personnalisé.</target>
+      </trans-unit>
+      <trans-unit id="6511739905483555779" datatype="html" approved="yes">
+        <source>Confirm rejection</source>
+        <target state="final">Confirmer le rejet</target>
+      </trans-unit>
+      <trans-unit id="6379405955227405291" datatype="html" approved="yes">
+        <source>Confirm signature</source>
+        <target state="final">Confirmer la signature</target>
+      </trans-unit>
+      <trans-unit id="5769275257319412572" datatype="html" approved="yes">
+        <source>Create new cabinet</source>
+        <target state="final">Créer un cabinet</target>
+      </trans-unit>
+      <trans-unit id="8676306044085431401" datatype="html" approved="yes">
+        <source>Delete signed copy</source>
+        <target state="final">Supprimer la copie signée</target>
+      </trans-unit>
+      <trans-unit id="4361568045684156139" datatype="html" approved="yes">
+        <source>Details:</source>
+        <target state="final">Détails :</target>
+      </trans-unit>
+      <trans-unit id="8439961140031146265" datatype="html" approved="yes">
+        <source>Do not change access</source>
+        <target state="final">Ne pas modifier les accès</target>
+      </trans-unit>
+      <trans-unit id="979931364673684537" datatype="html" approved="yes">
+        <source>Document ID</source>
+        <target state="final">Identifiant du document</target>
+      </trans-unit>
+      <trans-unit id="8020942748043500850" datatype="html" approved="yes">
+        <source>Document in trash</source>
+        <target state="final">Document dans la corbeille</target>
+      </trans-unit>
+      <trans-unit id="2877902835355860378" datatype="html" approved="yes">
+        <source>Document signed and saved as a signed copy.</source>
+        <target state="final">Document signé et enregistré comme copie signée.</target>
+      </trans-unit>
+      <trans-unit id="3209497787938330891" datatype="html" approved="yes">
+        <source>Does not belong to these cabinets</source>
+        <target state="final">N’appartient pas à ces cabinets</target>
+      </trans-unit>
+      <trans-unit id="1255935530149537077" datatype="html" approved="yes">
+        <source>Drag corner to resize</source>
+        <target state="final">Faites glisser un coin pour redimensionner</target>
+      </trans-unit>
+      <trans-unit id="3871955468734898678" datatype="html" approved="yes">
+        <source>Drag to move</source>
+        <target state="final">Faites glisser pour déplacer</target>
+      </trans-unit>
+      <trans-unit id="4145733693581081801" datatype="html" approved="yes">
+        <source>Edit cabinet</source>
+        <target state="final">Modifier le cabinet</target>
+      </trans-unit>
+      <trans-unit id="2713056560137504410" datatype="html" approved="yes">
+        <source>Error retrieving signature requests</source>
+        <target state="final">Erreur lors de la récupération des demandes de signature</target>
+      </trans-unit>
+      <trans-unit id="1948615675286412684" datatype="html" approved="yes">
+        <source>Error retrieving signed copies</source>
+        <target state="final">Erreur lors de la récupération des copies signées</target>
+      </trans-unit>
+      <trans-unit id="4606091236515013460" datatype="html" approved="yes">
+        <source>Error:</source>
+        <target state="final">Erreur :</target>
+      </trans-unit>
+      <trans-unit id="4821223569493547462" datatype="html" approved="yes">
+        <source>Final signed PDFs are kept separately from the document's normal versions.</source>
+        <target state="final">Les PDF signés définitifs sont conservés séparément des versions normales du document.</target>
+      </trans-unit>
+      <trans-unit id="340430316261570792" datatype="html" approved="yes">
+        <source>Finished</source>
+        <target state="final">Terminé</target>
+      </trans-unit>
+      <trans-unit id="1205619244206671527" datatype="html" approved="yes">
+        <source>If no rejection actions are added, rejection ends the workflow.</source>
+        <target state="final">Si aucune action de rejet n’est ajoutée, le rejet met fin au workflow.</target>
+      </trans-unit>
+      <trans-unit id="1137972907092556746" datatype="html" approved="yes">
+        <source>Message (optional)</source>
+        <target state="final">Message (facultatif)</target>
+      </trans-unit>
+      <trans-unit id="7858060057068625943" datatype="html" approved="yes">
+        <source>Message:</source>
+        <target state="final">Message :</target>
+      </trans-unit>
+      <trans-unit id="3382742199248391481" datatype="html" approved="yes">
+        <source>Monitor running document workflows and intervene when authorized.</source>
+        <target state="final">Surveillez les workflows de documents en cours et intervenez lorsque vous y êtes autorisé.</target>
+      </trans-unit>
+      <trans-unit id="5549743743867375696" datatype="html" approved="yes">
+        <source>My signature</source>
+        <target state="final">Ma signature</target>
+      </trans-unit>
+      <trans-unit id="3827743686171048925" datatype="html" approved="yes">
+        <source>No approval tasks found.</source>
+        <target state="final">Aucune tâche d’approbation trouvée.</target>
+      </trans-unit>
+      <trans-unit id="4759532015882562208" datatype="html" approved="yes">
+        <source>No other signers are available.</source>
+        <target state="final">Aucun autre signataire n’est disponible.</target>
+      </trans-unit>
+      <trans-unit id="8163818852286607250" datatype="html" approved="yes">
+        <source>No signature requests for this document.</source>
+        <target state="final">Aucune demande de signature pour ce document.</target>
+      </trans-unit>
+      <trans-unit id="8067417650724077753" datatype="html" approved="yes">
+        <source>No signature requests found.</source>
+        <target state="final">Aucune demande de signature trouvée.</target>
+      </trans-unit>
+      <trans-unit id="8569322327145208874" datatype="html" approved="yes">
+        <source>No signed copies are available to you.</source>
+        <target state="final">Aucune copie signée ne vous est accessible.</target>
+      </trans-unit>
+      <trans-unit id="3695094633913509100" datatype="html" approved="yes">
+        <source>No workflow activity found.</source>
+        <target state="final">Aucune activité de workflow trouvée.</target>
+      </trans-unit>
+      <trans-unit id="8322279868838039567" datatype="html" approved="yes">
+        <source>One member approves</source>
+        <target state="final">Un membre approuve</target>
+      </trans-unit>
+      <trans-unit id="8420162898148218685" datatype="html" approved="yes">
+        <source>One password per line. The workflow will try them in order until one succeeds.</source>
+        <target state="final">Un mot de passe par ligne. Le workflow les essaiera dans l’ordre jusqu’à ce que l’un d’eux fonctionne.</target>
+      </trans-unit>
+      <trans-unit id="5823609966674192057" datatype="html" approved="yes">
+        <source>Open signed copy</source>
+        <target state="final">Ouvrir la copie signée</target>
+      </trans-unit>
+      <trans-unit id="3495149227349932277" datatype="html" approved="yes">
+        <source>Original document</source>
+        <target state="final">Document original</target>
+      </trans-unit>
+      <trans-unit id="5540961214678838956" datatype="html" approved="yes">
+        <source>PNG, JPEG or a one-page PDF, up to 10 MB.</source>
+        <target state="final">PNG, JPEG ou PDF d’une page, jusqu’à 10 Mo.</target>
+      </trans-unit>
+      <trans-unit id="4775550080689015987" datatype="html" approved="yes">
+        <source>Reason</source>
+        <target state="final">Motif</target>
+      </trans-unit>
+      <trans-unit id="8645852774861371918" datatype="html" approved="yes">
+        <source>Reason (optional)</source>
+        <target state="final">Motif (facultatif)</target>
+      </trans-unit>
+      <trans-unit id="1102717806459547726" datatype="html" approved="yes">
+        <source>Refresh</source>
+        <target state="final">Actualiser</target>
+      </trans-unit>
+      <trans-unit id="7378878529334768232" datatype="html" approved="yes">
+        <source>Reject</source>
+        <target state="final">Rejeter</target>
+      </trans-unit>
+      <trans-unit id="1043889970846094345" datatype="html" approved="yes">
+        <source>Reject request</source>
+        <target state="final">Rejeter la demande</target>
+      </trans-unit>
+      <trans-unit id="5111809254607193700" datatype="html" approved="yes">
+        <source>Reject signature request</source>
+        <target state="final">Rejeter la demande de signature</target>
+      </trans-unit>
+      <trans-unit id="3847121139411989678" datatype="html" approved="yes">
+        <source>Rejection message:</source>
+        <target state="final">Message de rejet :</target>
+      </trans-unit>
+      <trans-unit id="2096820323802707529" datatype="html" approved="yes">
+        <source>Rejection path</source>
+        <target state="final">Chemin de rejet</target>
+      </trans-unit>
+      <trans-unit id="2222914600354616473" datatype="html" approved="yes">
+        <source>Rejection reason</source>
+        <target state="final">Motif du rejet</target>
+      </trans-unit>
+      <trans-unit id="7601142709304257138" datatype="html" approved="yes">
+        <source>Rejection recorded.</source>
+        <target state="final">Rejet enregistré.</target>
+      </trans-unit>
+      <trans-unit id="7551843847144686914" datatype="html" approved="yes">
+        <source>Remove cabinets</source>
+        <target state="final">Retirer les cabinets</target>
+      </trans-unit>
+      <trans-unit id="7715841303931420019" datatype="html" approved="yes">
+        <source>Replace signature</source>
+        <target state="final">Remplacer la signature</target>
+      </trans-unit>
+      <trans-unit id="3436626676237190683" datatype="html" approved="yes">
+        <source>Request message:</source>
+        <target state="final">Message de la demande :</target>
+      </trans-unit>
+      <trans-unit id="8793931442712571868" datatype="html" approved="yes">
+        <source>Request signature</source>
+        <target state="final">Demander une signature</target>
+      </trans-unit>
+      <trans-unit id="1206860394940784563" datatype="html" approved="yes">
+        <source>Requested by</source>
+        <target state="final">Demandé par</target>
+      </trans-unit>
+      <trans-unit id="2398407606701767789" datatype="html" approved="yes">
+        <source>Requests</source>
+        <target state="final">Demandes</target>
+      </trans-unit>
+      <trans-unit id="1236604279860679031" datatype="html" approved="yes">
+        <source>Restart</source>
+        <target state="final">Redémarrer</target>
+      </trans-unit>
+      <trans-unit id="2045736030716528609" datatype="html" approved="yes">
+        <source>Restart from step</source>
+        <target state="final">Redémarrer à partir de l’étape</target>
+      </trans-unit>
+      <trans-unit id="3967847665178012515" datatype="html" approved="yes">
+        <source>Restart workflow</source>
+        <target state="final">Redémarrer le workflow</target>
+      </trans-unit>
+      <trans-unit id="5612254519799299520" datatype="html" approved="yes">
+        <source>Review &amp; sign</source>
+        <target state="final">Examiner et signer</target>
+      </trans-unit>
+      <trans-unit id="1325889856682591547" datatype="html" approved="yes">
+        <source>Review and sign documents assigned to you.</source>
+        <target state="final">Examinez et signez les documents qui vous sont attribués.</target>
+      </trans-unit>
+      <trans-unit id="2849911267089552316" datatype="html" approved="yes">
+        <source>Review workflow approval steps assigned to you.</source>
+        <target state="final">Examinez les étapes d’approbation de workflow qui vous sont attribuées.</target>
+      </trans-unit>
+      <trans-unit id="4196863552407318610" datatype="html" approved="yes">
+        <source>Save signature</source>
+        <target state="final">Enregistrer la signature</target>
+      </trans-unit>
+      <trans-unit id="6118075812069908667" datatype="html" approved="yes">
+        <source>Search by document, requester or signer</source>
+        <target state="final">Rechercher par document, demandeur ou signataire</target>
+      </trans-unit>
+      <trans-unit id="1481456930966104824" datatype="html" approved="yes">
+        <source>Select one signer who has permission to view this document.</source>
+        <target state="final">Sélectionnez un signataire autorisé à consulter ce document.</target>
+      </trans-unit>
+      <trans-unit id="4723913395205484893" datatype="html" approved="yes">
+        <source>Selected signature preview</source>
+        <target state="final">Aperçu de la signature sélectionnée</target>
+      </trans-unit>
+      <trans-unit id="1134060368041257729" datatype="html" approved="yes">
+        <source>Show workflow steps</source>
+        <target state="final">Afficher les étapes du workflow</target>
+      </trans-unit>
+      <trans-unit id="7325022158550888168" datatype="html" approved="yes">
+        <source>Signature requested.</source>
+        <target state="final">Signature demandée.</target>
+      </trans-unit>
+      <trans-unit id="5665260384325208637" datatype="html" approved="yes">
+        <source>Signature saved.</source>
+        <target state="final">Signature enregistrée.</target>
+      </trans-unit>
+      <trans-unit id="8973531148721506562" datatype="html" approved="yes">
+        <source>Signature:</source>
+        <target state="final">Signature :</target>
+      </trans-unit>
+      <trans-unit id="8884818418204736381" datatype="html" approved="yes">
+        <source>Signed copies</source>
+        <target state="final">Copies signées</target>
+      </trans-unit>
+      <trans-unit id="8177756374160581035" datatype="html" approved="yes">
+        <source>Signed copy deleted</source>
+        <target state="final">Copie signée supprimée</target>
+      </trans-unit>
+      <trans-unit id="162587308487694225" datatype="html" approved="yes">
+        <source>Signer</source>
+        <target state="final">Signataire</target>
+      </trans-unit>
+      <trans-unit id="4563965495368336177" datatype="html" approved="yes">
+        <source>Skip</source>
+        <target state="final">Ignorer</target>
+      </trans-unit>
+      <trans-unit id="377786866114324716" datatype="html" approved="yes">
+        <source>Skip current step</source>
+        <target state="final">Ignorer l’étape actuelle</target>
+      </trans-unit>
+      <trans-unit id="7790601273873143939" datatype="html" approved="yes">
+        <source>Source version</source>
+        <target state="final">Version source</target>
+      </trans-unit>
+      <trans-unit id="4244129683657994983" datatype="html" approved="yes">
+        <source>Start workflow</source>
+        <target state="final">Démarrer le workflow</target>
+      </trans-unit>
+      <trans-unit id="935996979514299603" datatype="html" approved="yes">
+        <source>Tags only</source>
+        <target state="final">Étiquettes uniquement</target>
+      </trans-unit>
+      <trans-unit id="539980119898387308" datatype="html" approved="yes">
+        <source>Temporarily grant edit access</source>
+        <target state="final">Accorder temporairement l’accès en modification</target>
+      </trans-unit>
+      <trans-unit id="3064879794764327884" datatype="html" approved="yes">
+        <source>Temporarily grant view access</source>
+        <target state="final">Accorder temporairement l’accès en consultation</target>
+      </trans-unit>
+      <trans-unit id="6461858832872312332" datatype="html" approved="yes">
+        <source>The signer may then be requested to sign this version again.</source>
+        <target state="final">Le signataire pourra alors être invité à signer de nouveau cette version.</target>
+      </trans-unit>
+      <trans-unit id="2908817687060762418" datatype="html" approved="yes">
+        <source>The workflow waits here until the required approval is received.</source>
+        <target state="final">Le workflow attend ici jusqu’à réception de l’approbation requise.</target>
+      </trans-unit>
+      <trans-unit id="5687359516012772510" datatype="html" approved="yes">
+        <source>The workflow waits until this signer signs or rejects the request.</source>
+        <target state="final">Le workflow attend que ce signataire signe ou rejette la demande.</target>
+      </trans-unit>
+      <trans-unit id="7795752263793097081" datatype="html" approved="yes">
+        <source>This permanently deletes the signed PDF.</source>
+        <target state="final">Cette action supprime définitivement le PDF signé.</target>
+      </trans-unit>
+      <trans-unit id="3533174057966511835" datatype="html" approved="yes">
+        <source>This request targets an older version</source>
+        <target state="final">Cette demande concerne une ancienne version</target>
+      </trans-unit>
+      <trans-unit id="2029915744161466922" datatype="html" approved="yes">
+        <source>This step has not started yet.</source>
+        <target state="final">Cette étape n’a pas encore commencé.</target>
+      </trans-unit>
+      <trans-unit id="7364402658728305455" datatype="html" approved="yes">
+        <source>Unable to approve this step.</source>
+        <target state="final">Impossible d’approuver cette étape.</target>
+      </trans-unit>
+      <trans-unit id="6764340391633786404" datatype="html" approved="yes">
+        <source>Unable to cancel request</source>
+        <target state="final">Impossible d’annuler la demande</target>
+      </trans-unit>
+      <trans-unit id="7909844555804626529" datatype="html" approved="yes">
+        <source>Unable to cancel this workflow.</source>
+        <target state="final">Impossible d’annuler ce workflow.</target>
+      </trans-unit>
+      <trans-unit id="8220078076818337296" datatype="html" approved="yes">
+        <source>Unable to delete signed copy</source>
+        <target state="final">Impossible de supprimer la copie signée</target>
+      </trans-unit>
+      <trans-unit id="8496006836823926493" datatype="html" approved="yes">
+        <source>Unable to load approval tasks.</source>
+        <target state="final">Impossible de charger les tâches d’approbation.</target>
+      </trans-unit>
+      <trans-unit id="1586193220205381073" datatype="html" approved="yes">
+        <source>Unable to load workflow activity.</source>
+        <target state="final">Impossible de charger l’activité des workflows.</target>
+      </trans-unit>
+      <trans-unit id="8585941076423111256" datatype="html" approved="yes">
+        <source>Unable to manage this workflow.</source>
+        <target state="final">Impossible de gérer ce workflow.</target>
+      </trans-unit>
+      <trans-unit id="656427830700431699" datatype="html" approved="yes">
+        <source>Unable to open the requested document</source>
+        <target state="final">Impossible d’ouvrir le document demandé</target>
+      </trans-unit>
+      <trans-unit id="8131645844226557915" datatype="html" approved="yes">
+        <source>Unable to reject request</source>
+        <target state="final">Impossible de rejeter la demande</target>
+      </trans-unit>
+      <trans-unit id="1629680820772499280" datatype="html" approved="yes">
+        <source>Unable to reject this step.</source>
+        <target state="final">Impossible de rejeter cette étape.</target>
+      </trans-unit>
+      <trans-unit id="8256934529329435691" datatype="html" approved="yes">
+        <source>Unable to request signature</source>
+        <target state="final">Impossible de demander la signature</target>
+      </trans-unit>
+      <trans-unit id="8938377362937085298" datatype="html" approved="yes">
+        <source>Unable to save signature</source>
+        <target state="final">Impossible d’enregistrer la signature</target>
+      </trans-unit>
+      <trans-unit id="1543008100688103963" datatype="html" approved="yes">
+        <source>Unable to sign document</source>
+        <target state="final">Impossible de signer le document</target>
+      </trans-unit>
+      <trans-unit id="4154453429114591124" datatype="html" approved="yes">
+        <source>Unable to start this workflow.</source>
+        <target state="final">Impossible de démarrer ce workflow.</target>
+      </trans-unit>
+      <trans-unit id="5358305729081136265" datatype="html" approved="yes">
+        <source>Unable to update permissions</source>
+        <target state="final">Impossible de mettre à jour les autorisations</target>
+      </trans-unit>
+      <trans-unit id="204916992586116746" datatype="html" approved="yes">
+        <source>Upload signature</source>
+        <target state="final">Téléverser une signature</target>
+      </trans-unit>
+      <trans-unit id="2076075951011082785" datatype="html" approved="yes">
+        <source>View PDF</source>
+        <target state="final">Afficher le PDF</target>
+      </trans-unit>
+      <trans-unit id="8232383425219519339" datatype="html" approved="yes">
+        <source>Workflow activity</source>
+        <target state="final">Activité des workflows</target>
+      </trans-unit>
+      <trans-unit id="1807986359104855680" datatype="html" approved="yes">
+        <source>You must belong to the built-in Signers group to access Signature Requests.</source>
+        <target state="final">Vous devez appartenir au groupe intégré des signataires pour accéder au parapheur.</target>
+      </trans-unit>
+      <trans-unit id="324815946638606046" datatype="html" approved="yes">
+        <source>Your signature is private. Only you can retrieve or replace the source file.</source>
+        <target state="final">Votre signature est privée. Vous seul pouvez récupérer ou remplacer le fichier source.</target>
+      </trans-unit>
+      <trans-unit id="signaturePageCount" datatype="html" approved="yes">
+        <source>Page <x id="INTERPOLATION" equiv-text="{{ page }}"/> of <x id="INTERPOLATION_1" equiv-text="{{ pageCount }}"/></source>
+        <target state="final">Page <x id="INTERPOLATION" equiv-text="{{ page }}"/> sur <x id="INTERPOLATION_1" equiv-text="{{ pageCount }}"/></target>
+      </trans-unit>
+      <trans-unit id="signatureRequestedBy" datatype="html" approved="yes">
+        <source>Requested by <x id="INTERPOLATION" equiv-text="{{ request.requester?.username }}"/></source>
+        <target state="final">Demandé par <x id="INTERPOLATION" equiv-text="{{ request.requester?.username }}"/></target>
+      </trans-unit>
+      <trans-unit id="workflowRejectionPathFromStep" datatype="html" approved="yes">
+        <source>Rejection path from step <x id="INTERPOLATION" equiv-text="{{ parent }}"/></source>
+        <target state="final">Chemin de rejet depuis l’étape <x id="INTERPOLATION" equiv-text="{{ parent }}"/></target>
+      </trans-unit>
+      <trans-unit id="workflowAttempt" datatype="html" approved="yes">
+        <source>Attempt <x id="INTERPOLATION" equiv-text="{{ execution.attempt }}"/></source>
+        <target state="final">Tentative <x id="INTERPOLATION" equiv-text="{{ execution.attempt }}"/></target>
+      </trans-unit>
+      <trans-unit id="workflowDecidedBy" datatype="html" approved="yes">
+        <source> by <x id="INTERPOLATION" equiv-text="{{ task.decided_by }}"/></source>
+        <target state="final"> par <x id="INTERPOLATION" equiv-text="{{ task.decided_by }}"/></target>
+      </trans-unit>
+      <trans-unit id="workflowStartForDocument" datatype="html" approved="yes">
+        <source>Start “<x id="INTERPOLATION" equiv-text="{{ workflow.name }}"/>” for a document.</source>
+        <target state="final">Démarrer « <x id="INTERPOLATION" equiv-text="{{ workflow.name }}"/> » pour un document.</target>
+      </trans-unit>
     </body>
   </file>
 </xliff>

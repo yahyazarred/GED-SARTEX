@@ -7,6 +7,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import {
   SignatureRequest,
   SignatureRequestStatus,
+  signatureRequestStatusName,
   SignatureUser,
   SignedDocument,
 } from 'src/app/data/signature-request'
@@ -51,6 +52,7 @@ export class DocumentSignaturesComponent implements OnChanges {
   readonly signedDocuments = signal<SignedDocument[]>([])
   readonly saving = signal(false)
   readonly SignatureRequestStatus = SignatureRequestStatus
+  readonly signatureRequestStatusName = signatureRequestStatusName
   signerId: number | null = null
   message = ''
   activeView: 'requests' | 'signed' = 'requests'

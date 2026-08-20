@@ -16,6 +16,7 @@ import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import {
   SignatureRequest,
   SignatureRequestStatus,
+  signatureRequestStatusName,
 } from 'src/app/data/signature-request'
 import {
   PdfRenderMode,
@@ -70,6 +71,7 @@ export class ParapheurComponent implements OnInit {
   readonly signing = signal(false)
   readonly profileConfigured = signal(false)
   readonly SignatureRequestStatus = SignatureRequestStatus
+  readonly signatureRequestStatusName = signatureRequestStatusName
   readonly PdfRenderMode = PdfRenderMode
   readonly PdfZoomScale = PdfZoomScale
   readonly PdfZoomLevel = PdfZoomLevel
@@ -232,7 +234,7 @@ export class ParapheurComponent implements OnInit {
         next: () => {
           this.signing.set(false)
           this.selected.set(null)
-          this.toast.showInfo($localize`Document signed and saved as a new version.`)
+          this.toast.showInfo($localize`Document signed and saved as a signed copy.`)
           this.reload()
         },
         error: (error) => {

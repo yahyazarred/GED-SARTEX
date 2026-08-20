@@ -4,7 +4,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
 import { FormsModule } from '@angular/forms'
 import { RouterModule } from '@angular/router'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
-import { CircuitTask, CircuitTaskStatus } from 'src/app/data/circuit'
+import {
+  CircuitTask,
+  CircuitTaskStatus,
+  workflowStatusName,
+} from 'src/app/data/circuit'
 import { CircuitTaskService } from 'src/app/services/rest/circuit.service'
 import { ToastService } from 'src/app/services/toast.service'
 import { WebsocketStatusService } from 'src/app/services/websocket-status.service'
@@ -31,6 +35,7 @@ export class CircuitTasksComponent implements OnInit {
   readonly loading = signal(false)
   readonly deciding = signal<number>(null)
   readonly CircuitTaskStatus = CircuitTaskStatus
+  readonly workflowStatusName = workflowStatusName
   status: CircuitTaskStatus | null = CircuitTaskStatus.Pending
   rejectionTask: number | null = null
   rejectionReason = ''

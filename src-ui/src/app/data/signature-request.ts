@@ -20,6 +20,20 @@ export enum SignatureRequestStatus {
   Failed = 'failed',
 }
 
+export function signatureRequestStatusName(
+  status: SignatureRequestStatus | string | null | undefined
+): string {
+  const names: Record<string, string> = {
+    pending: $localize`:@@signatureStatusPending:Pending`,
+    processing: $localize`:@@signatureStatusProcessing:Processing`,
+    signed: $localize`:@@signatureStatusSigned:Signed`,
+    rejected: $localize`:@@signatureStatusRejected:Rejected`,
+    cancelled: $localize`:@@signatureStatusCancelled:Cancelled`,
+    failed: $localize`:@@signatureStatusFailed:Failed`,
+  }
+  return status ? (names[status] ?? status) : ''
+}
+
 export interface SignatureRequest extends ObjectWithId {
   document: number | null
   document_title?: string
