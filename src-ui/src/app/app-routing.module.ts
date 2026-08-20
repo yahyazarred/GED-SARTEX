@@ -15,8 +15,10 @@ import { DocumentAttributesComponent } from './components/manage/document-attrib
 import { MailComponent } from './components/manage/mail/mail.component'
 import { SavedViewsComponent } from './components/manage/saved-views/saved-views.component'
 import { WorkflowsComponent } from './components/manage/workflows/workflows.component'
+import { CircuitRunsComponent } from './components/manage/workflows/circuit-runs.component'
 import { NotFoundComponent } from './components/not-found/not-found.component'
 import { ParapheurComponent } from './components/parapheur/parapheur.component'
+import { CircuitTasksComponent } from './components/circuit-tasks/circuit-tasks.component'
 import { DirtyDocGuard } from './guards/dirty-doc.guard'
 import { DirtyFormGuard } from './guards/dirty-form.guard'
 import { DirtySavedViewGuard } from './guards/dirty-saved-view.guard'
@@ -224,12 +226,7 @@ export const routes: Routes = [
         path: 'settings',
         component: SettingsComponent,
         canDeactivate: [DirtyFormGuard],
-        canActivate: [PermissionsGuard],
         data: {
-          requiredPermission: {
-            action: PermissionAction.Change,
-            type: PermissionType.UISettings,
-          },
           componentName: 'SettingsComponent',
         },
       },
@@ -237,12 +234,7 @@ export const routes: Routes = [
         path: 'settings/:section',
         component: SettingsComponent,
         canDeactivate: [DirtyFormGuard],
-        canActivate: [PermissionsGuard],
         data: {
-          requiredPermission: {
-            action: PermissionAction.View,
-            type: PermissionType.UISettings,
-          },
           componentName: 'SettingsComponent',
         },
       },
@@ -274,6 +266,30 @@ export const routes: Routes = [
         path: 'customfields',
         redirectTo: '/attributes/customfields',
         pathMatch: 'full',
+      },
+      {
+        path: 'approval',
+        component: CircuitTasksComponent,
+        data: {
+          componentName: 'CircuitTasksComponent',
+        },
+      },
+      {
+        path: 'my-tasks',
+        redirectTo: '/approval',
+        pathMatch: 'full',
+      },
+      {
+        path: 'workflows/circuits',
+        component: CircuitRunsComponent,
+        canActivate: [PermissionsGuard],
+        data: {
+          requiredPermission: {
+            action: PermissionAction.View,
+            type: PermissionType.WorkflowActivity,
+          },
+          componentName: 'CircuitRunsComponent',
+        },
       },
       {
         path: 'workflows',

@@ -12,7 +12,7 @@ import {
   NgbPopoverModule,
 } from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
-import { takeUntil } from 'rxjs'
+import { finalize, takeUntil } from 'rxjs'
 import {
   SocialAccount,
   SocialAccountProvider,
@@ -95,9 +95,11 @@ export class ProfileEditDialogComponent
     this.networkActive.set(true)
     this.profileService
       .get()
-      .pipe(takeUntil(this.unsubscribeNotifier))
+      .pipe(
+        takeUntil(this.unsubscribeNotifier),
+        finalize(() => this.networkActive.set(false))
+      )
       .subscribe((profile) => {
-        this.networkActive.set(false)
         this.form.patchValue(profile)
         this.currentEmail = profile.email
         this.form.get('email').valueChanges.subscribe((newEmail) => {
@@ -193,6 +195,7 @@ export class ProfileEditDialogComponent
   }
 
   save(): void {
+    if (this.networkActive()) return
     const passwordChanged =
       this.newPassword && this.currentPassword !== this.newPassword
     const profile = Object.assign({}, this.form.value)
@@ -201,7 +204,10 @@ export class ProfileEditDialogComponent
     this.networkActive.set(true)
     this.profileService
       .update(profile)
-      .pipe(takeUntil(this.unsubscribeNotifier))
+      .pipe(
+        takeUntil(this.unsubscribeNotifier),
+        finalize(() => this.networkActive.set(false))
+      )
       .subscribe({
         next: () => {
           this.toastService.showInfo($localize`Profile updated successfully`)
@@ -220,7 +226,6 @@ export class ProfileEditDialogComponent
         error: (error) => {
           this.toastService.showError($localize`Error saving profile`, error)
           this.error.set(error?.error)
-          this.networkActive.set(false)
         },
       })
   }

@@ -12,6 +12,7 @@ export enum WebsocketStatusType {
   DOCUMENTS_DELETED = 'documents_deleted',
   DOCUMENT_UPDATED = 'document_updated',
   SIGNATURE_REQUEST_UPDATED = 'signature_request_updated',
+  CIRCUIT_TASK_UPDATED = 'circuit_task_updated',
 }
 
 export interface WebsocketSignatureRequestUpdatedMessage {
@@ -19,6 +20,15 @@ export interface WebsocketSignatureRequestUpdatedMessage {
   document_id: number
   status: string
   owner_id?: number
+  users_can_view?: number[]
+  groups_can_view?: number[]
+}
+
+export interface WebsocketCircuitTaskUpdatedMessage {
+  task_id: number
+  run_id: number
+  document_id: number
+  status: string
   users_can_view?: number[]
   groups_can_view?: number[]
 }
@@ -127,6 +137,8 @@ export class WebsocketStatusService {
     new Subject<WebsocketDocumentUpdatedMessage>()
   private readonly signatureRequestUpdatedSubject =
     new Subject<WebsocketSignatureRequestUpdatedMessage>()
+  private readonly circuitTaskUpdatedSubject =
+    new Subject<WebsocketCircuitTaskUpdatedMessage>()
   private readonly connectionStatusSubject = new Subject<boolean>()
 
   private get(taskId: string, filename?: string) {
@@ -204,6 +216,7 @@ export class WebsocketStatusService {
           | WebsocketDocumentsDeletedMessage
           | WebsocketDocumentUpdatedMessage
           | WebsocketSignatureRequestUpdatedMessage
+          | WebsocketCircuitTaskUpdatedMessage
       } = JSON.parse(ev.data)
 
       switch (type) {
@@ -229,6 +242,17 @@ export class WebsocketStatusService {
           ) {
             this.signatureRequestUpdatedSubject.next(
               messageData as WebsocketSignatureRequestUpdatedMessage
+            )
+          }
+          break
+        case WebsocketStatusType.CIRCUIT_TASK_UPDATED:
+          if (
+            this.canViewMessage(
+              messageData as WebsocketCircuitTaskUpdatedMessage
+            )
+          ) {
+            this.circuitTaskUpdatedSubject.next(
+              messageData as WebsocketCircuitTaskUpdatedMessage
             )
           }
           break
@@ -374,6 +398,10 @@ export class WebsocketStatusService {
 
   onSignatureRequestUpdated() {
     return this.signatureRequestUpdatedSubject.asObservable()
+  }
+
+  onCircuitTaskUpdated() {
+    return this.circuitTaskUpdatedSubject.asObservable()
   }
 
   onConnectionStatus() {

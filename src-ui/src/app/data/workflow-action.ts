@@ -7,6 +7,9 @@ export enum WorkflowActionType {
   Webhook = 4,
   PasswordRemoval = 5,
   MoveToTrash = 6,
+  Approval = 7,
+  SignatureRequest = 8,
+  AutomaticMatching = 9,
 }
 
 export interface WorkflowActionEmail extends ObjectWithId {
@@ -109,4 +112,18 @@ export interface WorkflowAction extends ObjectWithId {
   webhook?: WorkflowActionWebhook
 
   passwords?: string[]
+
+  approval_user?: number
+
+  approval_group?: number
+
+  approval_mode?: 'one' | 'all'
+
+  temporary_access?: 'none' | 'view' | 'change'
+
+  signature_signer?: number
+
+  matching_mode?: 'all' | 'tags' | 'cabinet'
+
+  branch_parent_order?: number
 }

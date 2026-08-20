@@ -1,4 +1,11 @@
-import { Component, forwardRef, inject, Input } from '@angular/core'
+import {
+  Component,
+  Input,
+  computed,
+  forwardRef,
+  inject,
+  signal,
+} from '@angular/core'
 import { toSignal } from '@angular/core/rxjs-interop'
 import {
   FormsModule,
@@ -25,17 +32,32 @@ import { AbstractInputComponent } from '../../abstract-input'
   imports: [NgSelectComponent, FormsModule, ReactiveFormsModule],
 })
 export class PermissionsUserComponent extends AbstractInputComponent<User[]> {
+  private readonly excludedUserIdsSignal = signal<number[]>([])
+
   @Input()
-  excludedUserIds: number[] = []
+  set excludedUserIds(value: number[]) {
+    const next = value ?? []
+    const current = this.excludedUserIdsSignal()
+    if (
+      current.length !== next.length ||
+      current.some((id, index) => id !== next[index])
+    ) {
+      this.excludedUserIdsSignal.set([...next])
+    }
+  }
+
+  get excludedUserIds(): number[] {
+    return this.excludedUserIdsSignal()
+  }
 
   private readonly userService = inject(UserService)
   readonly users = toSignal(
     this.userService.listAll().pipe(map((result) => result.results)),
     { initialValue: undefined as User[] }
   )
-  availableUsers(): User[] {
-    return (this.users() ?? []).filter(
-      (user) => !this.excludedUserIds.includes(user.id)
+  readonly availableUsers = computed(() =>
+    (this.users() ?? []).filter(
+      (user) => !this.excludedUserIdsSignal().includes(user.id)
     )
-  }
+  )
 }

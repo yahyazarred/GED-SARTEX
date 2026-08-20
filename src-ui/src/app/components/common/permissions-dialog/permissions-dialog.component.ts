@@ -3,6 +3,7 @@ import {
   EventEmitter,
   Input,
   Output,
+  computed,
   inject,
   signal,
 } from '@angular/core'
@@ -44,13 +45,26 @@ export class PermissionsDialogComponent {
   readonly note = signal<string>(null)
   readonly buttonsEnabled = signal(true)
   private o: ObjectWithPermissions = undefined
-  protectedUserId: number = null
+  private readonly protectedUserIdSignal = signal<number>(null)
 
-  visibleUsers(): User[] {
-    return (this.users() ?? []).filter(
-      (user) => user.id !== this.protectedUserId
-    )
+  set protectedUserId(value: number) {
+    this.protectedUserIdSignal.set(value)
   }
+
+  get protectedUserId(): number {
+    return this.protectedUserIdSignal()
+  }
+
+  readonly visibleUsers = computed(() =>
+    (this.users() ?? []).filter(
+      (user) => user.id !== this.protectedUserIdSignal()
+    )
+  )
+
+  readonly excludedUserIds = computed(() => {
+    const protectedUserId = this.protectedUserIdSignal()
+    return protectedUserId ? [protectedUserId] : []
+  })
 
   @Output()
   public confirmClicked = new EventEmitter()

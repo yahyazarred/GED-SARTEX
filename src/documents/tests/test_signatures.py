@@ -36,9 +36,6 @@ class SignatureApiTest(DirectoriesMixin, APITestCase):
         )
         self.signer.groups.add(self.signers_group)
         self.other_signer.groups.add(self.signers_group)
-        view_document = Permission.objects.get(codename="view_document")
-        self.signer.user_permissions.add(view_document)
-        self.other_signer.user_permissions.add(view_document)
         self.requester.user_permissions.add(
             Permission.objects.get(codename="add_signaturerequest"),
         )
@@ -48,6 +45,33 @@ class SignatureApiTest(DirectoriesMixin, APITestCase):
             mime_type="application/pdf",
             owner=self.requester,
         )
+        assign_perm("documents.view_document", self.signer, self.document)
+        assign_perm("documents.view_document", self.other_signer, self.document)
+
+    def test_signature_request_history_survives_document_trash(self):
+        signature_request = SignatureRequest.objects.create(
+            document=self.document,
+            requested_version=self.document,
+            requester=self.requester,
+            signer=self.signer,
+            status=SignatureRequest.Status.REJECTED,
+        )
+
+        self.document.delete()
+
+        signature_request.refresh_from_db()
+        self.assertIsNone(signature_request.document_id)
+        self.assertIsNone(signature_request.requested_version_id)
+        self.assertEqual(signature_request.requested_document_title, "Contract")
+
+        self.client.force_authenticate(self.signer)
+        response = self.client.get("/api/signature_requests/?assigned_to_me=true")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.data["results"][0]
+        self.assertEqual(result["id"], signature_request.id)
+        self.assertIsNone(result["document"])
+        self.assertEqual(result["document_title"], "Contract")
+        self.assertEqual(result["status"], SignatureRequest.Status.REJECTED)
 
     def test_only_signer_can_upload_and_retrieve_raw_signature(self):
         signature = SimpleUploadedFile(
@@ -140,7 +164,7 @@ class SignatureApiTest(DirectoriesMixin, APITestCase):
         first = self.client.post("/api/signature_requests/", payload, format="json")
         second = self.client.post("/api/signature_requests/", payload, format="json")
 
-        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(SignatureRequest.objects.count(), 1)
 
@@ -223,7 +247,7 @@ class SignatureApiTest(DirectoriesMixin, APITestCase):
             },
             format="json",
         )
-        self.assertEqual(retry.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(retry.status_code, status.HTTP_201_CREATED, retry.data)
 
     def test_document_access_does_not_grant_signed_copy_access(self):
         signature_request = SignatureRequest.objects.create(
@@ -523,6 +547,7 @@ class SignatureApiTest(DirectoriesMixin, APITestCase):
             },
             format="json",
         )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
         self.client.post(
             f"/api/signature_requests/{created.data['id']}/cancel/",
             {},

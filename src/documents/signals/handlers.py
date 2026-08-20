@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import User
 from django.db import DatabaseError
+from django.db import IntegrityError
 from django.db import close_old_connections
 from django.db import connections
 from django.db import models
@@ -950,6 +951,24 @@ def run_workflows(
                 break
 
         if matching.document_matches_workflow(document, workflow, trigger_type):
+            if workflow.is_circuit:
+                # Consumption triggers run before a Document exists and may only
+                # mutate metadata overrides. Stateful circuits therefore start on
+                # persisted-document triggers (added, updated, scheduled or manual).
+                if use_overrides:
+                    continue
+                from documents.workflows.circuits import start_circuit
+
+                try:
+                    start_circuit(workflow, document, trigger_type)
+                except IntegrityError:
+                    logger.info(
+                        "Circuit %s is already active for document %s",
+                        workflow.pk,
+                        document.pk,
+                        extra={"group": logging_group},
+                    )
+                continue
             action: WorkflowAction
             has_move_to_trash_action = False
             for action in workflow.actions.order_by("order", "pk"):

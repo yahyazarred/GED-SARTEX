@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core'
 import { FormsModule, ReactiveFormsModule } from '@angular/forms'
+import { RouterModule } from '@angular/router'
 import { NgbDropdownModule, NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import { takeUntil, tap } from 'rxjs'
@@ -16,6 +17,7 @@ import {
 } from '../../common/edit-dialog/workflow-edit-dialog/workflow-edit-dialog.component'
 import { PageHeaderComponent } from '../../common/page-header/page-header.component'
 import { LoadingComponentWithPermissions } from '../../loading-component/loading.component'
+import { CircuitStartDialogComponent } from './circuit-start-dialog.component'
 
 @Component({
   selector: 'pngx-workflows',
@@ -28,6 +30,7 @@ import { LoadingComponentWithPermissions } from '../../loading-component/loading
     ReactiveFormsModule,
     NgbDropdownModule,
     NgxBootstrapIconsModule,
+    RouterModule,
   ],
 })
 export class WorkflowsComponent
@@ -122,6 +125,13 @@ export class WorkflowsComponent
       }),
     ]
     this.editWorkflow(clone, true)
+  }
+
+  startCircuit(workflow: Workflow) {
+    const modal = this.modalService.open(CircuitStartDialogComponent, {
+      backdrop: 'static',
+    })
+    modal.componentInstance.workflow = workflow
   }
 
   deleteWorkflow(workflow: Workflow) {

@@ -67,11 +67,7 @@ class TestApiUiSettings(DirectoriesMixin, APITestCase):
         )
 
     def test_api_get_ui_settings_identifies_signer(self) -> None:
-        signers = Group.objects.create(name="Signers")
-        BuiltInGroup.objects.create(
-            key=BuiltInGroup.Key.SIGNERS,
-            group=signers,
-        )
+        signers = Group.objects.get(built_in_identity__key=BuiltInGroup.Key.SIGNERS)
         self.test_user.groups.add(signers)
 
         response = self.client.get(self.ENDPOINT, format="json")
@@ -102,7 +98,7 @@ class TestApiUiSettings(DirectoriesMixin, APITestCase):
             settings["settings"],
         )
 
-    def test_api_set_ui_settings_insufficient_global_permissions(self) -> None:
+    def test_api_set_ui_settings_requires_no_global_permissions(self) -> None:
         not_superuser = User.objects.create_user(username="test_not_superuser")
         self.client.force_authenticate(user=not_superuser)
 
@@ -120,7 +116,11 @@ class TestApiUiSettings(DirectoriesMixin, APITestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            not_superuser.ui_settings.settings,
+            settings["settings"],
+        )
 
     def test_api_set_ui_settings_sufficient_global_permissions(self) -> None:
         not_superuser = User.objects.create_user(username="test_not_superuser")

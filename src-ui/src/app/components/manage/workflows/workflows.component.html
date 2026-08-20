@@ -8,6 +8,7 @@
   <button type="button" class="btn btn-sm btn-outline-primary" (click)="editWorkflow()" *pngxIfPermissions="{ action: PermissionAction.Add, type: PermissionType.Workflow }">
     <i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add Workflow</ng-container>
   </button>
+  <a class="btn btn-sm btn-outline-secondary" routerLink="/workflows/circuits" *pngxIfPermissions="{ action: PermissionAction.View, type: PermissionType.WorkflowActivity }" i18n>Workflow activity</a>
 </pngx-page-header>
 
 <ul class="list-group">
@@ -32,7 +33,7 @@
   @for (workflow of workflows(); track workflow.id) {
     <li class="list-group-item">
       <div class="row fade" [class.show]="show()">
-        <div class="col d-flex align-items-center"><button class="btn btn-link p-0 text-start" type="button" (click)="editWorkflow(workflow)" [disabled]="!permissionsService.currentUserCan(PermissionAction.Change, PermissionType.Workflow)">{{workflow.name}}</button></div>
+        <div class="col d-flex align-items-center gap-2"><button class="btn btn-link p-0 text-start" type="button" (click)="editWorkflow(workflow)" [disabled]="!permissionsService.currentUserCan(PermissionAction.Change, PermissionType.Workflow)">{{workflow.name}}</button></div>
         <div class="col d-flex align-items-center d-none d-sm-flex"><code>{{workflow.order}}</code></div>
         <div class="col d-flex align-items-center">
           <div class="form-check form-switch mb-0">
@@ -59,6 +60,11 @@
           </div>
           <div class="btn-toolbar d-none d-sm-flex gap-2" role="toolbar">
             <div class="btn-group">
+              @if (workflow.is_circuit) {
+                <button *pngxIfPermissions="{ action: PermissionAction.Add, type: PermissionType.WorkflowActivity }" class="btn btn-sm btn-outline-success" type="button" (click)="startCircuit(workflow)">
+                  <i-bs width="1em" height="1em" name="play" class="me-1"></i-bs><ng-container i18n>Start</ng-container>
+                </button>
+              }
               <button *pngxIfPermissions="{ action: PermissionAction.Change, type: PermissionType.Workflow }" class="btn btn-sm btn-outline-secondary" type="button" (click)="editWorkflow(workflow)">
                 <i-bs width="1em" height="1em" name="pencil" class="me-1"></i-bs><ng-container i18n>Edit</ng-container>
               </button>

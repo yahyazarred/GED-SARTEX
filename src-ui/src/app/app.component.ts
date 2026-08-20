@@ -152,18 +152,11 @@ export class AppComponent implements OnInit, OnDestroy {
           this.router.navigate(['/documents'])
         })
     }
-    if (
-      this.permissionsService.currentUserCan(
-        PermissionAction.Change,
-        PermissionType.UISettings
-      )
-    ) {
-      this.hotKeyService
-        .addShortcut({ keys: 's', description: $localize`Settings` })
-        .subscribe(() => {
-          this.router.navigate(['/settings'])
-        })
-    }
+    this.hotKeyService
+      .addShortcut({ keys: 's', description: $localize`Settings` })
+      .subscribe(() => {
+        this.router.navigate(['/settings'])
+      })
 
     this.tourService.initialize([
       {

@@ -295,5 +295,11 @@ describe('EditDialogComponent', () => {
     expect(fixture.nativeElement.querySelector('.error').textContent).toContain(
       'Name is required.'
     )
+
+    button.click()
+    await fixture.whenStable()
+    httpTestingController
+      .expectOne(`${environment.apiBaseUrl}tags/`)
+      .flush({ id: 1, name: 'Corrected name' })
   })
 })

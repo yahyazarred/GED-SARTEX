@@ -19,6 +19,8 @@ from documents.views import BulkDownloadView
 from documents.views import BulkEditObjectsView
 from documents.views import BulkEditView
 from documents.views import CabinetViewSet
+from documents.views import CircuitRunViewSet
+from documents.views import CircuitTaskViewSet
 from documents.views import ChatStreamingView
 from documents.views import CorrespondentViewSet
 from documents.views import CustomFieldViewSet
@@ -53,6 +55,7 @@ from documents.views import UiSettingsView
 from documents.views import UnifiedSearchViewSet
 from documents.views import WorkflowActionViewSet
 from documents.views import WorkflowTriggerViewSet
+from documents.views import WorkflowStepViewSet
 from documents.views import WorkflowViewSet
 from documents.views import serve_logo
 from paperless.consumers import StatusConsumer
@@ -93,6 +96,9 @@ api_router.register(r"signed_documents", SignedDocumentViewSet, basename="signed
 api_router.register(r"workflow_triggers", WorkflowTriggerViewSet)
 api_router.register(r"workflow_actions", WorkflowActionViewSet)
 api_router.register(r"workflows", WorkflowViewSet)
+api_router.register(r"workflow_steps", WorkflowStepViewSet)
+api_router.register(r"circuit_runs", CircuitRunViewSet, basename="circuit-run")
+api_router.register(r"circuit_tasks", CircuitTaskViewSet, basename="circuit-task")
 api_router.register(r"custom_fields", CustomFieldViewSet)
 api_router.register(r"config", ApplicationConfigurationViewSet)
 api_router.register(r"processed_mail", ProcessedMailViewSet)

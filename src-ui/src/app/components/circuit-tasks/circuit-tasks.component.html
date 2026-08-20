@@ -1,0 +1,56 @@
+<pngx-page-header title="Approval" i18n-title icon="clipboard-check" info="Review workflow approval steps assigned to you." i18n-info>
+  <button class="btn btn-sm btn-outline-secondary" type="button" (click)="reload()">
+    <i-bs name="arrow-clockwise" class="me-1"></i-bs><ng-container i18n>Refresh</ng-container>
+  </button>
+</pngx-page-header>
+
+<div class="d-flex gap-2 mb-3">
+  <select class="form-select form-select-sm w-auto" [(ngModel)]="status" (ngModelChange)="reload()">
+    <option [ngValue]="null" i18n>All tasks</option>
+    <option [ngValue]="CircuitTaskStatus.Pending" i18n>Pending</option>
+    <option [ngValue]="CircuitTaskStatus.Approved" i18n>Approved</option>
+    <option [ngValue]="CircuitTaskStatus.Rejected" i18n>Rejected</option>
+    <option [ngValue]="CircuitTaskStatus.Cancelled" i18n>Cancelled</option>
+  </select>
+</div>
+
+@if (loading()) {
+  <div class="spinner-border spinner-border-sm" role="status"></div>
+} @else {
+  <div class="list-group">
+    @for (task of tasks(); track task.id) {
+      <div class="list-group-item">
+        <div class="d-flex align-items-start gap-3">
+          <div class="flex-grow-1">
+            <div class="fw-semibold">{{ task.step_name }}</div>
+            <a [routerLink]="['/documents', task.document]">{{ task.document_title }}</a>
+            <div class="small text-muted">{{ task.workflow_name }} · {{ task.created | date:'medium' }}</div>
+            @if (task.comment) { <div class="small mt-2">{{ task.comment }}</div> }
+          </div>
+          <span class="badge" [class.text-bg-warning]="task.status === CircuitTaskStatus.Pending"
+            [class.text-bg-success]="task.status === CircuitTaskStatus.Approved"
+            [class.text-bg-danger]="task.status === CircuitTaskStatus.Rejected"
+            [class.text-bg-secondary]="task.status === CircuitTaskStatus.Cancelled">{{ task.status }}</span>
+        </div>
+        @if (task.status === CircuitTaskStatus.Pending) {
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <button class="btn btn-sm btn-outline-danger" type="button" (click)="rejectionTask = task.id" i18n>Reject</button>
+            <button class="btn btn-sm btn-success" type="button" (click)="approve(task)" [disabled]="deciding() === task.id" i18n>Approve</button>
+          </div>
+          @if (rejectionTask === task.id) {
+            <div class="border-top mt-3 pt-3">
+              <label class="form-label" [for]="'rejection-' + task.id" i18n>Rejection reason</label>
+              <textarea class="form-control" [id]="'rejection-' + task.id" [(ngModel)]="rejectionReason" maxlength="2000" rows="3"></textarea>
+              <div class="d-flex justify-content-end gap-2 mt-2">
+                <button class="btn btn-sm btn-outline-secondary" type="button" (click)="rejectionTask = null" i18n>Cancel</button>
+                <button class="btn btn-sm btn-danger" type="button" (click)="reject(task)" [disabled]="!rejectionReason.trim() || deciding() === task.id" i18n>Confirm rejection</button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    } @empty {
+      <div class="list-group-item text-muted" i18n>No approval tasks found.</div>
+    }
+  </div>
+}

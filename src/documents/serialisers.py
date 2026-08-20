@@ -25,6 +25,7 @@ from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.core.validators import integer_validator
 from django.db.models import Count
+from django.db.models import F
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -58,6 +59,9 @@ from documents import bulk_edit
 from documents.data_models import DocumentSource
 from documents.filters import CustomFieldQueryParser
 from documents.models import Cabinet
+from documents.models import CircuitRun
+from documents.models import CircuitStepExecution
+from documents.models import CircuitTask
 from documents.models import Correspondent
 from documents.models import CustomField
 from documents.models import CustomFieldInstance
@@ -81,6 +85,7 @@ from documents.models import WorkflowAction
 from documents.models import WorkflowActionEmail
 from documents.models import WorkflowActionWebhook
 from documents.models import WorkflowTrigger
+from documents.models import WorkflowStep
 from documents.parsers import is_mime_type_supported
 from documents.permissions import get_document_count_filter_for_user
 from documents.permissions import get_groups_with_only_permission
@@ -1084,6 +1089,16 @@ class SignatureProfileSerializer(serializers.ModelSerializer[SignatureProfile]):
 
 
 class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
+    document = serializers.PrimaryKeyRelatedField(
+        queryset=Document.objects.all(),
+        allow_null=False,
+        required=True,
+    )
+    requested_version = serializers.PrimaryKeyRelatedField(
+        queryset=Document.objects.all(),
+        allow_null=False,
+        required=True,
+    )
     requester = BasicUserSerializer(read_only=True)
     signer = BasicUserSerializer(read_only=True)
     signer_id = serializers.PrimaryKeyRelatedField(
@@ -1091,7 +1106,7 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
         queryset=User.objects.filter(groups__built_in_identity__key="signers"),
         write_only=True,
     )
-    document_title = serializers.CharField(source="document.title", read_only=True)
+    document_title = serializers.SerializerMethodField()
     source_is_latest = serializers.SerializerMethodField()
     signed_document = serializers.SerializerMethodField()
     signed_copy_deleted = serializers.SerializerMethodField()
@@ -1139,9 +1154,16 @@ class SignatureRequestSerializer(serializers.ModelSerializer[SignatureRequest]):
         ]
 
     def get_source_is_latest(self, obj) -> bool:
-        root = obj.document.root_document or obj.document
+        document = obj.document or obj.requested_version
+        if document is None or obj.requested_version_id is None:
+            return False
+        root = document.root_document or document
         latest = root.versions.order_by("-version_index").first()
         return obj.requested_version_id == (latest.id if latest else root.id)
+
+    def get_document_title(self, obj) -> str:
+        document = obj.document or obj.requested_version
+        return document.title if document is not None else obj.requested_document_title
 
     def get_signed_document(self, obj) -> int | None:
         try:
@@ -3571,6 +3593,13 @@ class WorkflowActionSerializer(serializers.ModelSerializer[WorkflowAction]):
             "email",
             "webhook",
             "passwords",
+            "approval_user",
+            "approval_group",
+            "approval_mode",
+            "temporary_access",
+            "signature_signer",
+            "matching_mode",
+            "branch_parent_order",
         ]
 
     def validate(self, attrs):
@@ -3644,6 +3673,29 @@ class WorkflowActionSerializer(serializers.ModelSerializer[WorkflowAction]):
                     "Passwords are required for password removal actions",
                 )
 
+        action_type = attrs.get("type", getattr(self.instance, "type", None))
+        if action_type == WorkflowAction.WorkflowActionType.APPROVAL:
+            approval_user = attrs.get(
+                "approval_user", getattr(self.instance, "approval_user", None)
+            )
+            approval_group = attrs.get(
+                "approval_group", getattr(self.instance, "approval_group", None)
+            )
+            if bool(approval_user) == bool(approval_group):
+                raise serializers.ValidationError(
+                    "Approval actions require exactly one user or group."
+                )
+        if (
+            action_type == WorkflowAction.WorkflowActionType.SIGNATURE_REQUEST
+            and attrs.get(
+                "signature_signer", getattr(self.instance, "signature_signer", None)
+            )
+            is None
+        ):
+            raise serializers.ValidationError(
+                "A signer is required for signature request actions."
+            )
+
         return attrs
 
 
@@ -3660,9 +3712,81 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
             "name",
             "order",
             "enabled",
+            "is_circuit",
             "triggers",
             "actions",
         ]
+
+    def validate(self, attrs):
+        stateful_action_types = {
+            WorkflowAction.WorkflowActionType.APPROVAL,
+            WorkflowAction.WorkflowActionType.SIGNATURE_REQUEST,
+            WorkflowAction.WorkflowActionType.AUTOMATIC_MATCHING,
+        }
+        actions = attrs.get("actions")
+        if actions is not None:
+            for index, action in enumerate(actions):
+                parent_order = action.get("branch_parent_order")
+                if parent_order is not None and not (0 <= parent_order < index):
+                    raise serializers.ValidationError(
+                        {
+                            "actions": (
+                                "Rejection branch actions must follow their parent "
+                                "action in the same workflow."
+                            )
+                        }
+                    )
+                if parent_order is not None:
+                    parent = actions[parent_order]
+                    if parent.get("branch_parent_order") is not None or parent.get(
+                        "type"
+                    ) not in {
+                        WorkflowAction.WorkflowActionType.APPROVAL,
+                        WorkflowAction.WorkflowActionType.SIGNATURE_REQUEST,
+                    }:
+                        raise serializers.ValidationError(
+                            {
+                                "actions": (
+                                    "Rejection branches must belong to a main approval "
+                                    "or signature request action."
+                                )
+                            }
+                        )
+                if action.get("type") == WorkflowAction.WorkflowActionType.MOVE_TO_TRASH:
+                    branch_parent = action.get("branch_parent_order")
+                    if any(
+                        later.get("branch_parent_order") == branch_parent
+                        for later in actions[index + 1 :]
+                    ):
+                        raise serializers.ValidationError(
+                            {
+                                "actions": (
+                                    "Move to trash must be the final action in its "
+                                    "workflow path."
+                                )
+                            }
+                        )
+        is_circuit = (
+            any(action.get("type") in stateful_action_types for action in actions)
+            if actions is not None
+            else (self.instance.is_circuit if self.instance else False)
+        )
+        attrs["is_circuit"] = is_circuit
+        triggers = attrs.get("triggers")
+        if is_circuit and triggers is not None and any(
+            trigger.get("type") == WorkflowTrigger.WorkflowTriggerType.CONSUMPTION
+            for trigger in triggers
+        ):
+            raise serializers.ValidationError(
+                {
+                    "triggers": (
+                        "Workflows with approval, signature, or matching actions "
+                        "require a persisted document. Use the Document Added "
+                        "trigger for uploaded documents."
+                    ),
+                },
+            )
+        return attrs
 
     def update_triggers_and_actions(
         self,
@@ -3846,7 +3970,60 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
             instance.triggers.set(set_triggers)
         if actions is not serializers.empty:
             instance.actions.set(set_actions)
+            self.sync_workflow_steps(instance, set_actions)
         instance.save()
+
+    @staticmethod
+    def sync_workflow_steps(instance: Workflow, actions: list[WorkflowAction]) -> None:
+        """Keep the stateful engine's internal steps aligned with the ordered actions."""
+        instance.steps.update(order=F("order") + 100000)
+        type_map = {
+            WorkflowAction.WorkflowActionType.APPROVAL: WorkflowStep.StepType.APPROVAL,
+            WorkflowAction.WorkflowActionType.SIGNATURE_REQUEST: WorkflowStep.StepType.SIGNATURE,
+            WorkflowAction.WorkflowActionType.AUTOMATIC_MATCHING: WorkflowStep.StepType.MATCHING,
+        }
+        for order, action in enumerate(actions):
+            step, _ = WorkflowStep.objects.get_or_create(
+                workflow=instance,
+                action=action,
+                defaults={
+                    "name": action.get_type_display(),
+                    "order": order,
+                    "type": type_map.get(action.type, WorkflowStep.StepType.ACTION),
+                },
+            )
+            step.name = action.get_type_display()
+            step.order = order
+            step.type = type_map.get(action.type, WorkflowStep.StepType.ACTION)
+            step.approval_user = action.approval_user
+            step.approval_group = action.approval_group
+            step.approval_mode = action.approval_mode
+            step.temporary_access = action.temporary_access
+            step.signature_signer = action.signature_signer
+            step.matching_mode = action.matching_mode
+            step.save()
+
+        steps_by_order = {
+            step.order: step
+            for step in instance.steps.filter(action__in=actions)
+        }
+        for order, action in enumerate(actions):
+            step = steps_by_order[order]
+            first_branch_order = next(
+                (
+                    branch_order
+                    for branch_order, branch_action in enumerate(actions)
+                    if branch_action.branch_parent_order == order
+                ),
+                None,
+            )
+            step.rejection_step = steps_by_order.get(first_branch_order)
+            step.save(update_fields=["rejection_step"])
+
+        # Historical steps stay intact for monitoring old runs, but new runs only
+        # traverse steps whose actions still belong to the workflow.
+        instance.is_circuit = any(action.type in type_map for action in actions)
+        instance.save(update_fields=["is_circuit"])
 
     def prune_triggers_and_actions(self) -> None:
         """
@@ -3859,7 +4036,8 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
 
         WorkflowAction.objects.annotate(
             workflow_count=Count("workflows"),
-        ).filter(workflow_count=0).delete()
+            circuit_step_count=Count("circuit_steps"),
+        ).filter(workflow_count=0, circuit_step_count=0).delete()
 
         WorkflowActionEmail.objects.filter(action=None).delete()
         WorkflowActionWebhook.objects.filter(action=None).delete()
@@ -3888,6 +4066,262 @@ class WorkflowSerializer(serializers.ModelSerializer[Workflow]):
 
         return instance
 
+
+class WorkflowStepSerializer(serializers.ModelSerializer[WorkflowStep]):
+    class Meta:
+        model = WorkflowStep
+        fields = [
+            "id",
+            "workflow",
+            "name",
+            "order",
+            "type",
+            "action",
+            "approval_user",
+            "approval_group",
+            "approval_mode",
+            "temporary_access",
+            "signature_signer",
+            "matching_mode",
+            "rejection_step",
+        ]
+
+    def validate(self, attrs):
+        instance = self.instance or WorkflowStep()
+        for field, value in attrs.items():
+            setattr(instance, field, value)
+        try:
+            instance.clean()
+        except ValidationError as error:
+            detail = error.message_dict if hasattr(error, "message_dict") else error.messages
+            raise serializers.ValidationError(detail) from error
+        return attrs
+
+
+class CircuitTaskSerializer(serializers.ModelSerializer[CircuitTask]):
+    document = serializers.IntegerField(source="run.document_id", read_only=True)
+    document_title = serializers.CharField(source="run.document.title", read_only=True)
+    workflow_name = serializers.CharField(source="run.workflow.name", read_only=True)
+    step_name = serializers.CharField(source="step.name", read_only=True)
+    assigned_to_username = serializers.CharField(
+        source="assigned_to.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = CircuitTask
+        fields = [
+            "id",
+            "run",
+            "step",
+            "step_name",
+            "document",
+            "document_title",
+            "workflow_name",
+            "assigned_to",
+            "assigned_to_username",
+            "status",
+            "comment",
+            "decided_by",
+            "created",
+            "completed",
+            "attempt",
+        ]
+        read_only_fields = fields
+
+
+class CircuitStepExecutionSerializer(
+    serializers.ModelSerializer[CircuitStepExecution],
+):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+
+    class Meta:
+        model = CircuitStepExecution
+        fields = [
+            "id",
+            "attempt",
+            "status",
+            "started",
+            "completed",
+            "actor",
+            "actor_username",
+            "detail",
+            "error",
+        ]
+        read_only_fields = fields
+
+
+class CircuitRunSerializer(serializers.ModelSerializer[CircuitRun]):
+    workflow_name = serializers.CharField(source="workflow.name", read_only=True)
+    document_title = serializers.CharField(source="document.title", read_only=True)
+    current_step_name = serializers.CharField(
+        source="current_step.name",
+        read_only=True,
+    )
+    tasks = serializers.SerializerMethodField()
+    steps = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CircuitRun
+        fields = [
+            "id",
+            "workflow",
+            "workflow_name",
+            "document",
+            "document_title",
+            "trigger_type",
+            "current_step",
+            "current_step_name",
+            "status",
+            "started_by",
+            "started",
+            "modified",
+            "completed",
+            "failure_message",
+            "tasks",
+            "steps",
+        ]
+        read_only_fields = fields
+
+    def get_tasks(self, obj) -> list[dict]:
+        request = self.context.get("request")
+        queryset = obj.tasks.all()
+        if request is not None and not (
+            request.user.is_superuser
+            or request.user.has_perm("documents.view_circuitrun")
+            or request.user.has_perm("documents.change_circuitrun")
+        ):
+            queryset = queryset.filter(assigned_to=request.user)
+        return CircuitTaskSerializer(queryset, many=True).data
+
+    def get_steps(self, obj) -> list[dict]:
+        request = self.context.get("request")
+        if request is not None and not (
+            request.user.is_superuser
+            or request.user.has_perm("documents.view_circuitrun")
+            or request.user.has_perm("documents.change_circuitrun")
+        ):
+            return []
+        steps = sorted(
+            (
+                step
+                for step in obj.workflow.steps.all()
+                if step.action_id is None
+                or any(
+                    workflow.id == obj.workflow_id
+                    for workflow in step.action.workflows.all()
+                )
+            ),
+            key=lambda step: (step.order, step.pk),
+        )
+        executions = {}
+        for execution in obj.step_executions.all():
+            executions.setdefault(execution.step_id, []).append(execution)
+        tasks = {}
+        for task in obj.tasks.all():
+            tasks.setdefault(task.step_id, []).append(
+                {
+                    "id": task.id,
+                    "assigned_to": task.assigned_to.username,
+                    "status": task.status,
+                    "comment": task.comment,
+                    "decided_by": task.decided_by.username if task.decided_by else None,
+                    "created": task.created,
+                    "completed": task.completed,
+                    "attempt": task.attempt,
+                },
+            )
+        signature_requests = {}
+        for signature_request in obj.signature_requests.all():
+            signature_requests.setdefault(signature_request.circuit_step_id, []).append(
+                {
+                    "id": signature_request.id,
+                    "signer": signature_request.signer.username,
+                    "requester": signature_request.requester.username,
+                    "status": signature_request.status,
+                    "rejection_reason": signature_request.rejection_reason,
+                    "failure_message": signature_request.failure_message,
+                    "created": signature_request.created,
+                    "completed": signature_request.completed,
+                },
+            )
+
+        result = []
+        main_steps = [
+            candidate
+            for candidate in steps
+            if not candidate.action_id
+            or candidate.action.branch_parent_order is None
+        ]
+        main_numbers = {
+            candidate.order: index + 1 for index, candidate in enumerate(main_steps)
+        }
+        for step in steps:
+            branch_parent = step.action.branch_parent_order if step.action_id else None
+            if branch_parent is None:
+                display_number = str(main_numbers[step.order])
+            else:
+                siblings = [
+                    candidate
+                    for candidate in steps
+                    if candidate.action_id
+                    and candidate.action.branch_parent_order == branch_parent
+                    and candidate.order <= step.order
+                ]
+                parent_number = main_numbers.get(branch_parent, branch_parent + 1)
+                display_number = f"{parent_number}.{chr(96 + len(siblings))}"
+            step_executions = executions.get(step.id, [])
+            if step_executions:
+                latest_status = step_executions[-1].status
+            elif signature_requests.get(step.id):
+                signature_status = signature_requests[step.id][0]["status"]
+                latest_status = {
+                    SignatureRequest.Status.PENDING: "waiting",
+                    SignatureRequest.Status.PROCESSING: "running",
+                    SignatureRequest.Status.SIGNED: "succeeded",
+                    SignatureRequest.Status.REJECTED: "rejected",
+                    SignatureRequest.Status.CANCELLED: "cancelled",
+                    SignatureRequest.Status.FAILED: "failed",
+                }[signature_status]
+            elif tasks.get(step.id):
+                task_statuses = {task["status"] for task in tasks[step.id]}
+                if CircuitTask.Status.REJECTED in task_statuses:
+                    latest_status = "rejected"
+                elif CircuitTask.Status.PENDING in task_statuses:
+                    latest_status = "waiting"
+                elif CircuitTask.Status.APPROVED in task_statuses:
+                    latest_status = "succeeded"
+                else:
+                    latest_status = "cancelled"
+            elif obj.current_step_id == step.id:
+                latest_status = (
+                    "failed" if obj.status == CircuitRun.Status.FAILED else obj.status
+                )
+            else:
+                latest_status = "not_started"
+            result.append(
+                {
+                    "id": step.id,
+                    "name": step.name,
+                    "type": step.type,
+                    "order": step.order,
+                    "display_number": display_number,
+                    "is_rejection_branch": branch_parent is not None,
+                    "branch_parent_number": (
+                        str(main_numbers.get(branch_parent, branch_parent + 1))
+                        if branch_parent is not None
+                        else None
+                    ),
+                    "status": latest_status,
+                    "executions": CircuitStepExecutionSerializer(
+                        step_executions,
+                        many=True,
+                    ).data,
+                    "approval_tasks": tasks.get(step.id, []),
+                    "signature_requests": signature_requests.get(step.id, []),
+                },
+            )
+        return result
 
 class TrashSerializer(SerializerWithPerms):
     documents = serializers.ListField(

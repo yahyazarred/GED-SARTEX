@@ -48,8 +48,7 @@
         <button ngbDropdownItem class="nav-link" (click)="editProfile()">
           <i-bs class="me-2" name="person"></i-bs><ng-container i18n>My Profile</ng-container>
         </button>
-        <a ngbDropdownItem class="nav-link" routerLink="settings" (click)="closeMenu()"
-          *pngxIfPermissions="{ action: PermissionAction.Change, type: PermissionType.UISettings }">
+        <a ngbDropdownItem class="nav-link" routerLink="settings" (click)="closeMenu()">
           <i-bs class="me-2" name="gear"></i-bs><ng-container i18n>Settings</ng-container>
         </a>
         <a ngbDropdownItem class="nav-link d-flex" href="accounts/logout/" (click)="onLogout()">
@@ -263,6 +262,21 @@
                 <i-bs class="me-2" name="boxes"></i-bs><span><ng-container i18n>Workflows</ng-container></span>
               </a>
             </li>
+            <li class="nav-item app-link"
+              *pngxIfPermissions="{ action: PermissionAction.View, type: PermissionType.WorkflowActivity }">
+              <a class="nav-link" routerLink="workflows/circuits" routerLinkActive="active" (click)="closeMenu()"
+                ngbPopover="Workflow activity" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"
+                container="body" triggers="mouseenter:mouseleave" popoverClass="popover-slim">
+                <i-bs class="me-2" name="diagram-3"></i-bs><span><ng-container i18n>Workflow activity</ng-container></span>
+              </a>
+            </li>
+            <li class="nav-item app-link">
+              <a class="nav-link" routerLink="approval" routerLinkActive="active" (click)="closeMenu()"
+                ngbPopover="Approval" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"
+                container="body" triggers="mouseenter:mouseleave" popoverClass="popover-slim">
+                <i-bs class="me-2" name="clipboard-check"></i-bs><span><ng-container i18n>Approval</ng-container></span>
+              </a>
+            </li>
             <li class="nav-item app-link" *pngxIfPermissions="{ action: PermissionAction.View, type: PermissionType.MailAccount }"
               tourAnchor="tour.mail">
               <a class="nav-link" routerLink="mail" routerLinkActive="active" (click)="closeMenu()" ngbPopover="Mail"
@@ -286,8 +300,7 @@
             <span i18n>Administration</span>
           </h6>
           <ul class="nav flex-column mb-2">
-            <li class="nav-item app-link" *pngxIfPermissions="{ action: PermissionAction.Change, type: PermissionType.UISettings }"
-              tourAnchor="tour.settings">
+            <li class="nav-item app-link" tourAnchor="tour.settings">
               <a class="nav-link" routerLink="settings" routerLinkActive="active" (click)="closeMenu()"
                 ngbPopover="Settings" i18n-ngbPopover [disablePopover]="!slimSidebarEnabled" placement="end"
                 container="body" triggers="mouseenter:mouseleave" popoverClass="popover-slim">
@@ -382,7 +395,7 @@
                         </a>
                       }
                     } @else {
-                      <a  *pngxIfPermissions="{ action: PermissionAction.Change, type: PermissionType.UISettings }" class="small text-decoration-none" routerLink="/settings" fragment="update-checking"
+                      <a class="small text-decoration-none" routerLink="/settings" fragment="update-checking"
                         [ngbPopover]="updateCheckingNotEnabledPopContent" popoverClass="shadow" triggers="mouseenter"
                         container="body">
                         <i-bs width="1.2em" height="1.2em" name="info-circle"></i-bs>

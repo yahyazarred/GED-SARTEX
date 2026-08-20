@@ -81,7 +81,10 @@
                     <div ngbAccordionHeader cdkDrag>
                       <button ngbAccordionButton>
                         <i-bs name="grip-vertical" class="ms-n3 pe-1"></i-bs>
-                        {{i + 1}}. {{getActionTypeOptionName(actionFields.controls[i].value.type)}}
+                        {{getActionNumber(i)}}. {{getActionTypeOptionName(actionFields.controls[i].value.type)}}
+                        @if (actionFields.controls[i].value.branch_parent_order !== null) {
+                          <span class="badge bg-warning text-dark ms-2" i18n>Rejection path</span>
+                        }
                         @if(action.id) {
                           <span class="badge bg-primary text-primary-text-contrast ms-2">ID: {{action.id}}</span>
                         }
@@ -96,7 +99,7 @@
                     </div>
                     <div ngbAccordionCollapse>
                       <div ngbAccordionBody>
-                        <ng-template [ngTemplateOutlet]="actionForm" [ngTemplateOutletContext]="{ formGroup: actionFields.controls[i], action: action }"></ng-template>
+                        <ng-template [ngTemplateOutlet]="actionForm" [ngTemplateOutletContext]="{ formGroup: actionFields.controls[i], action: action, i: i }"></ng-template>
                       </div>
                     </div>
                   </div>
@@ -252,7 +255,7 @@
   </div>
 </ng-template>
 
-<ng-template #actionForm let-formGroup="formGroup" let action="action">
+<ng-template #actionForm let-formGroup="formGroup" let-action="action" let-i="i">
   <div [formGroup]="formGroup">
     <input type="hidden" formControlName="id" />
     <pngx-input-select i18n-title title="Action type" [horizontal]="true" [items]="actionTypeOptions" formControlName="type"></pngx-input-select>
@@ -464,6 +467,46 @@
             <p class="text-muted small" i18n>The document will be moved to the trash at the end of the workflow run.</p>
           </div>
         </div>
+      }
+      @case (WorkflowActionType.Approval) {
+        <div class="row">
+          <div class="col-md-6">
+            <pngx-input-select i18n-title title="Send approval to" [items]="approvalTargetOptions" formControlName="approval_target"></pngx-input-select>
+          </div>
+          @if (formGroup.get('approval_target').value === 'group') {
+            <div class="col-md-6">
+              <pngx-input-select i18n-title title="Approver group" [items]="groups()" bindLabel="name" [allowNull]="true" formControlName="approval_group"></pngx-input-select>
+            </div>
+          } @else {
+            <div class="col-md-6">
+              <pngx-input-select i18n-title title="Approver" [items]="activeUsers" bindLabel="username" [allowNull]="true" formControlName="approval_user"></pngx-input-select>
+            </div>
+          }
+          <div class="col-md-6">
+            <pngx-input-select i18n-title title="Approval requirement" [items]="approvalModeOptions" formControlName="approval_mode"></pngx-input-select>
+          </div>
+          <div class="col-md-6">
+            <pngx-input-select i18n-title title="Document access while waiting" [items]="temporaryAccessOptions" formControlName="temporary_access"></pngx-input-select>
+          </div>
+          <div class="col-12"><p class="small text-muted" i18n>The workflow waits here until the required approval is received.</p></div>
+          @if (formGroup.get('branch_parent_order').value === null) {
+            <div class="col-12">
+              <button class="btn btn-sm btn-outline-warning" type="button" (click)="addAction(i)"><i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add rejection action</ng-container></button>
+              <span class="small text-muted ms-2" i18n>If no rejection actions are added, rejection ends the workflow.</span>
+            </div>
+          }
+        </div>
+      }
+      @case (WorkflowActionType.SignatureRequest) {
+        <pngx-input-select i18n-title title="Request signature from" [items]="signerUsers" bindLabel="username" [allowNull]="true" formControlName="signature_signer"></pngx-input-select>
+        @if (formGroup.get('branch_parent_order').value === null) {
+          <button class="btn btn-sm btn-outline-warning mb-3" type="button" (click)="addAction(i)"><i-bs name="plus-circle" class="me-1"></i-bs><ng-container i18n>Add rejection action</ng-container></button>
+          <span class="small text-muted ms-2" i18n>If no rejection actions are added, rejection ends the workflow.</span>
+        }
+        <p class="small text-muted" i18n>The workflow waits until this signer signs or rejects the request.</p>
+      }
+      @case (WorkflowActionType.AutomaticMatching) {
+        <pngx-input-select i18n-title title="Run automatic matching for" [items]="matchingModeOptions" formControlName="matching_mode"></pngx-input-select>
       }
     }
   </div>

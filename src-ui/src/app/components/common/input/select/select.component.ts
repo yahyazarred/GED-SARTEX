@@ -45,6 +45,14 @@ export class SelectComponent extends AbstractInputComponent<number> {
 
   @Input()
   set items(items) {
+    if (
+      this._items &&
+      items &&
+      this._items.length === items.length &&
+      this._items.every((item, index) => item === items[index])
+    ) {
+      return
+    }
     this._items = items
     if (items && this.value) this.checkForPrivateItems(this.value)
   }

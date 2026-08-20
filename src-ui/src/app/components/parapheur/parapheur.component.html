@@ -65,7 +65,12 @@
       @for (request of requests(); track request.id) {
         <div class="list-group-item d-flex align-items-center gap-3">
           <div class="flex-grow-1">
-            <a [routerLink]="['/documents', request.document]">{{ request.document_title }}</a>
+            @if (request.document) {
+              <a [routerLink]="['/documents', request.document]">{{ request.document_title }}</a>
+            } @else {
+              <span>{{ request.document_title }}</span>
+              <span class="badge text-bg-secondary ms-2" i18n>Document in trash</span>
+            }
             <div class="small text-muted">
               <span i18n>Requested by {{ request.requester?.username }}</span> · {{ request.created | date:'medium' }}
             </div>

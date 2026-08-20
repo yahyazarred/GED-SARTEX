@@ -35,6 +35,7 @@ import { CorrespondentService } from 'src/app/services/rest/correspondent.servic
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import { MailRuleService } from 'src/app/services/rest/mail-rule.service'
+import { GroupService } from 'src/app/services/rest/group.service'
 import { StoragePathService } from 'src/app/services/rest/storage-path.service'
 import { SettingsService } from 'src/app/services/settings.service'
 import { CustomFieldQueryExpression } from 'src/app/utils/custom-field-query-element'
@@ -158,6 +159,12 @@ describe('WorkflowEditDialogComponent', () => {
               of({
                 results: [],
               }),
+          },
+        },
+        {
+          provide: GroupService,
+          useValue: {
+            listAll: () => of({ results: [] }),
           },
         },
         {

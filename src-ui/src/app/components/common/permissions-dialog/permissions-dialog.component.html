@@ -7,7 +7,7 @@
 
   <form [formGroup]="form">
     <div class="form-group">
-      <pngx-permissions-form [users]="visibleUsers()" [excludedUserIds]="protectedUserId ? [protectedUserId] : []" formControlName="permissions_form"></pngx-permissions-form>
+      <pngx-permissions-form [users]="visibleUsers()" [excludedUserIds]="excludedUserIds()" formControlName="permissions_form"></pngx-permissions-form>
     </div>
     <div class="form-group mt-4">
       <div class="offset-lg-3 row">

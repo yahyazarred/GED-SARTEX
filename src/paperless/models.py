@@ -21,6 +21,7 @@ class BuiltInGroup(models.Model):
     key = models.CharField(max_length=64, unique=True, choices=Key.choices)
 
     class Meta:
+        default_permissions = ()
         verbose_name = _("built-in group")
         verbose_name_plural = _("built-in groups")
 

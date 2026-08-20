@@ -85,6 +85,13 @@ export class PermissionsSelectComponent
   inheritedWarning: string = $localize`Inherited from group`
 
   public allowedTypes = Object.keys(PermissionType)
+  private readonly typeLabels: Partial<Record<keyof typeof PermissionType, string>> = {
+    WorkflowActivity: $localize`Workflow activity`,
+  }
+
+  getTypeLabel(type: string): string {
+    return this.typeLabels[type as keyof typeof PermissionType] ?? type
+  }
 
   constructor() {
     super()
@@ -262,7 +269,9 @@ export class PermissionsSelectComponent
       (type === PermissionType.SignatureRequest &&
         action === PermissionAction.Delete) ||
       (type === PermissionType.SignedDocument &&
-        action === PermissionAction.Add)
+        action === PermissionAction.Add) ||
+      (type === PermissionType.WorkflowActivity &&
+        action === PermissionAction.Delete)
     ) {
       return false
     }

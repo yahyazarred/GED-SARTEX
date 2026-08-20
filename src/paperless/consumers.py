@@ -66,3 +66,9 @@ class StatusConsumer(AsyncWebsocketConsumer):
             await self.close()
         elif await self._can_view(event["data"]):
             await self.send(json.dumps(event))
+
+    async def circuit_task_updated(self, event) -> None:
+        if not self._authenticated():
+            await self.close()
+        elif await self._can_view(event["data"]):
+            await self.send(json.dumps(event))

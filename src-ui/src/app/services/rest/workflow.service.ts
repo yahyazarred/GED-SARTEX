@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core'
 import { tap } from 'rxjs'
 import { Workflow } from 'src/app/data/workflow'
+import { CircuitRun } from 'src/app/data/circuit'
+import { Observable } from 'rxjs'
 import { AbstractPaperlessService } from './abstract-paperless-service'
 
 @Injectable({
@@ -36,5 +38,12 @@ export class WorkflowService extends AbstractPaperlessService<Workflow> {
 
   delete(o: Workflow) {
     return super.delete(o).pipe(tap(() => this.reload()))
+  }
+
+  start(workflow: Workflow, document: number): Observable<CircuitRun> {
+    return this.http.post<CircuitRun>(
+      this.getResourceUrl(workflow.id, 'start'),
+      { document }
+    )
   }
 }

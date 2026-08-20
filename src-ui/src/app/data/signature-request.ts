@@ -21,7 +21,7 @@ export enum SignatureRequestStatus {
 }
 
 export interface SignatureRequest extends ObjectWithId {
-  document: number
+  document: number | null
   document_title?: string
   requested_version: number
   signed_document?: number

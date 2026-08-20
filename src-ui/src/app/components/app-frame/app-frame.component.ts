@@ -233,16 +233,7 @@ export class AppFrameComponent
   }
 
   get canSaveSettings(): boolean {
-    return (
-      this.permissionsService.currentUserCan(
-        PermissionAction.Change,
-        PermissionType.UISettings
-      ) &&
-      this.permissionsService.currentUserCan(
-        PermissionAction.Add,
-        PermissionType.UISettings
-      )
-    )
+    return true
   }
 
   get canManageAttributes(): boolean {

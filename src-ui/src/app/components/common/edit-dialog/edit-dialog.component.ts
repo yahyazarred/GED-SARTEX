@@ -10,7 +10,7 @@ import {
 } from '@angular/core'
 import { FormGroup } from '@angular/forms'
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
-import { Observable } from 'rxjs'
+import { Observable, finalize } from 'rxjs'
 import {
   MATCHING_ALGORITHMS,
   MATCH_AUTO,
@@ -115,8 +115,13 @@ export abstract class EditDialogComponent<
 
     this.userService.listAll().subscribe((r) => {
       this.users = r.results
+      this.onUsersLoaded(this.users)
       this.changeDetector.markForCheck()
     })
+  }
+
+  protected onUsersLoaded(users: User[]): void {
+    this.users = users
   }
 
   getCreateTitle() {
@@ -161,6 +166,7 @@ export abstract class EditDialogComponent<
   }
 
   save() {
+    if (this.networkActive) return
     this.error = null
     const formValues = this.getFormValues()
     const permissionsObject: PermissionsFormObject =
@@ -186,18 +192,23 @@ export abstract class EditDialogComponent<
         break
     }
     this.networkActive = true
-    serverResponse.subscribe({
-      next: (result) => {
-        this.activeModal.close()
-        this.succeeded.emit(result)
-      },
-      error: (error) => {
-        this.error = error.error
-        this.networkActive = false
-        this.failed.next(error)
-        this.changeDetector.markForCheck()
-      },
-    })
+    serverResponse
+      .pipe(
+        finalize(() => {
+          this.networkActive = false
+          this.changeDetector.markForCheck()
+        })
+      )
+      .subscribe({
+        next: (result) => {
+          this.activeModal.close()
+          this.succeeded.emit(result)
+        },
+        error: (error) => {
+          this.error = error.error
+          this.failed.next(error)
+        },
+      })
   }
 
   cancel() {

@@ -158,6 +158,9 @@ from documents.matching import match_document_types
 from documents.matching import match_storage_paths
 from documents.matching import match_tags
 from documents.models import Cabinet
+from documents.models import CircuitRun
+from documents.models import CircuitStepExecution
+from documents.models import CircuitTask
 from documents.models import Correspondent
 from documents.models import CustomField
 from documents.models import CustomFieldInstance
@@ -177,6 +180,7 @@ from documents.models import UiSettings
 from documents.models import Workflow
 from documents.models import WorkflowAction
 from documents.models import WorkflowTrigger
+from documents.models import WorkflowStep
 from documents.permissions import AcknowledgeTasksPermissions
 from documents.permissions import PaperlessAdminPermissions
 from documents.permissions import PaperlessNotePermissions
@@ -199,6 +203,8 @@ from documents.serialisers import BulkDownloadSerializer
 from documents.serialisers import BulkEditObjectsSerializer
 from documents.serialisers import BulkEditSerializer
 from documents.serialisers import CabinetSerializer
+from documents.serialisers import CircuitRunSerializer
+from documents.serialisers import CircuitTaskSerializer
 from documents.serialisers import CorrespondentSerializer
 from documents.serialisers import CustomFieldSerializer
 from documents.serialisers import DeleteDocumentsSerializer
@@ -238,6 +244,7 @@ from documents.serialisers import UiSettingsViewSerializer
 from documents.serialisers import WorkflowActionSerializer
 from documents.serialisers import WorkflowSerializer
 from documents.serialisers import WorkflowTriggerSerializer
+from documents.serialisers import WorkflowStepSerializer
 from documents.signals import document_updated
 from documents.signatures import create_signed_document
 from documents.signatures import normalize_signature
@@ -644,6 +651,9 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             request.user,
             details=locked.rejection_reason,
         )
+        from documents.workflows.circuits import signature_request_completed
+
+        signature_request_completed(locked)
         return Response(self.get_serializer(locked).data)
 
     @action(detail=True, methods=["get"], url_path="document")
@@ -683,6 +693,9 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             locked.save(update_fields=["status", "completed"])
         _notify_signature_request(locked)
         _log_signature_event(locked, "Signature Request Cancelled", request.user)
+        from documents.workflows.circuits import signature_request_completed
+
+        signature_request_completed(locked)
         return Response(self.get_serializer(locked).data)
 
     @action(detail=True, methods=["post"])
@@ -741,6 +754,9 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
                 request.user,
                 details=locked.failure_message,
             )
+            from documents.workflows.circuits import signature_request_completed
+
+            signature_request_completed(locked)
             raise ValidationError(str(error)) from error
         with transaction.atomic():
             locked = SignatureRequest.objects.select_for_update().get(pk=signature_request.pk)
@@ -780,6 +796,9 @@ class SignatureRequestViewSet(ModelViewSet[SignatureRequest]):
             locked.save()
         _notify_signature_request(locked)
         _log_signature_event(locked, "Document Signed", request.user)
+        from documents.workflows.circuits import signature_request_completed
+
+        signature_request_completed(locked)
         return Response(self.get_serializer(locked).data)
 
 
@@ -4629,7 +4648,7 @@ class StoragePathViewSet(PermissionsAwareDocumentCountMixin, ModelViewSet[Storag
 
 class UiSettingsView(GenericAPIView[Any]):
     queryset = UiSettings.objects.all()
-    permission_classes = (IsAuthenticated, PaperlessObjectPermissions)
+    permission_classes = (IsAuthenticated,)
     serializer_class = UiSettingsViewSerializer
 
     def get(self, request, format=None):
@@ -5590,6 +5609,365 @@ class WorkflowViewSet(ModelViewSet[Workflow]):
             ),
         )
     )
+
+    def perform_destroy(self, instance: Workflow) -> None:
+        # Runs protect their current step so execution history cannot be damaged
+        # accidentally. An explicit workflow deletion owns that history, however,
+        # and removes it first so the workflow and its internal steps can cascade.
+        with transaction.atomic():
+            instance.circuit_runs.all().delete()
+            instance.delete()
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def start(self, request, pk=None):
+        if not (
+            request.user.is_superuser
+            or request.user.has_perm("documents.view_workflow")
+        ):
+            raise PermissionDenied("You cannot view this workflow.")
+        workflow = self.get_object()
+        if not (
+            request.user.is_superuser
+            or request.user.has_perm("documents.add_circuitrun")
+        ):
+            raise PermissionDenied("You cannot start document workflows.")
+        if not workflow.is_circuit:
+            raise ValidationError("Only stateful workflows can be started manually.")
+        document = get_object_or_404(Document, pk=request.data.get("document"))
+        if not has_perms_owner_aware(request.user, "view_document", document):
+            raise PermissionDenied("You cannot view this document.")
+        from documents.workflows.circuits import start_circuit
+
+        try:
+            run = start_circuit(workflow, document, actor=request.user)
+        except IntegrityError as error:
+            raise ValidationError(
+                "This workflow is already active for the document.",
+            ) from error
+        return Response(
+            CircuitRunSerializer(run, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WorkflowStepViewSet(ModelViewSet[WorkflowStep]):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = WorkflowStepSerializer
+    pagination_class = StandardPagination
+    model = WorkflowStep
+    queryset = WorkflowStep.objects.all().select_related(
+        "workflow",
+        "action",
+        "approval_user",
+        "approval_group",
+        "signature_signer",
+        "rejection_step",
+    )
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filterset_fields = ("workflow", "type")
+    ordering_fields = ("order", "name")
+    http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser or self.request.user.has_perm(
+            "documents.view_circuitrun",
+        ) or self.request.user.has_perm("documents.change_circuitrun"):
+            return self.queryset
+        return self.queryset.none()
+
+
+class CircuitTaskViewSet(ModelViewSet[CircuitTask]):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CircuitTaskSerializer
+    pagination_class = StandardPagination
+    http_method_names = ["get", "post", "head", "options"]
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filterset_fields = ("status", "run", "step")
+    ordering_fields = ("created", "completed", "status")
+
+    def create(self, request, *args, **kwargs):
+        raise ValidationError("Approval tasks are created by the workflow engine.")
+
+    def get_queryset(self):
+        queryset = CircuitTask.objects.select_related(
+            "run",
+            "run__document",
+            "run__workflow",
+            "step",
+            "assigned_to",
+            "decided_by",
+        )
+        if self.request.user.is_superuser or self.request.user.has_perm(
+            "documents.view_circuitrun",
+        ):
+            return queryset
+        return queryset.filter(assigned_to=self.request.user)
+
+    def _decide(self, request, approved: bool):
+        task = self.get_object()
+        from documents.workflows.circuits import decide_task
+
+        try:
+            run = decide_task(
+                task,
+                request.user,
+                approved,
+                str(request.data.get("comment", "")),
+            )
+        except ValueError as error:
+            raise ValidationError(str(error)) from error
+        return Response(CircuitRunSerializer(run, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        return self._decide(request, True)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        return self._decide(request, False)
+
+
+class CircuitRunViewSet(ModelViewSet[CircuitRun]):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CircuitRunSerializer
+    pagination_class = StandardPagination
+    http_method_names = ["get", "post", "head", "options"]
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filterset_fields = ("status", "workflow", "document")
+    ordering_fields = ("started", "modified", "completed", "status")
+
+    def create(self, request, *args, **kwargs):
+        raise ValidationError("Start workflows through the workflow start action.")
+
+    def get_queryset(self):
+        queryset = CircuitRun.objects.select_related(
+            "workflow",
+            "document",
+            "current_step",
+            "started_by",
+        ).prefetch_related(
+            Prefetch(
+                "workflow__steps",
+                queryset=WorkflowStep.objects.select_related("action").prefetch_related(
+                    "action__workflows",
+                ),
+            ),
+            Prefetch(
+                "tasks",
+                queryset=CircuitTask.objects.select_related(
+                    "step",
+                    "assigned_to",
+                    "decided_by",
+                    "run__document",
+                    "run__workflow",
+                ),
+            ),
+            Prefetch(
+                "step_executions",
+                queryset=CircuitStepExecution.objects.select_related("actor", "step"),
+            ),
+            Prefetch(
+                "signature_requests",
+                queryset=SignatureRequest.objects.select_related("signer", "requester"),
+            ),
+        )
+        if self.request.user.is_superuser or any(
+            self.request.user.has_perm(permission)
+            for permission in (
+                "documents.view_circuitrun",
+                "documents.change_circuitrun",
+            )
+        ):
+            return queryset
+        return queryset.filter(tasks__assigned_to=self.request.user).distinct()
+
+    def _require_manager(self, request) -> None:
+        if not (
+            request.user.is_superuser
+            or request.user.has_perm("documents.change_circuitrun")
+        ):
+            raise PermissionDenied("You cannot manage workflow activity.")
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        self._require_manager(request)
+        run = self.get_object()
+        if run.status not in (CircuitRun.Status.RUNNING, CircuitRun.Status.WAITING):
+            raise ValidationError("Only active workflows can be cancelled.")
+        from documents.workflows.circuits import _revoke_task_access
+        from documents.workflows.circuits import notify_circuit_task
+
+        pending_tasks = list(
+            run.tasks.filter(status=CircuitTask.Status.PENDING).select_related(
+                "assigned_to",
+                "run__document",
+            ),
+        )
+        run.tasks.filter(status=CircuitTask.Status.PENDING).update(
+            status=CircuitTask.Status.CANCELLED,
+            completed=timezone.now(),
+        )
+        for task in pending_tasks:
+            task.status = CircuitTask.Status.CANCELLED
+            _revoke_task_access(task)
+            notify_circuit_task(task)
+        pending_signatures = list(run.signature_requests.filter(
+            status__in=[
+                SignatureRequest.Status.PENDING,
+                SignatureRequest.Status.PROCESSING,
+            ],
+        ))
+        run.signature_requests.filter(
+            status__in=[
+                SignatureRequest.Status.PENDING,
+                SignatureRequest.Status.PROCESSING,
+            ],
+        ).update(status=SignatureRequest.Status.CANCELLED, completed=timezone.now())
+        for signature_request in pending_signatures:
+            signature_request.status = SignatureRequest.Status.CANCELLED
+            _notify_signature_request(signature_request)
+        run.step_executions.filter(
+            status__in=[
+                CircuitStepExecution.Status.RUNNING,
+                CircuitStepExecution.Status.WAITING,
+            ],
+        ).update(
+            status=CircuitStepExecution.Status.CANCELLED,
+            completed=timezone.now(),
+            actor=request.user,
+            detail="Workflow cancelled by an administrator.",
+        )
+        run.status = CircuitRun.Status.CANCELLED
+        run.completed = timezone.now()
+        run.save(update_fields=["status", "completed", "modified"])
+        return Response(self.get_serializer(run).data)
+
+    @action(detail=True, methods=["post"], url_path="restart-from-step")
+    def restart_from_step(self, request, pk=None):
+        self._require_manager(request)
+        run = self.get_object()
+        step = get_object_or_404(run.workflow.steps, pk=request.data.get("step"))
+        reason = str(request.data.get("reason", "")).strip()
+        if not reason:
+            raise ValidationError("A reason is required when restarting a workflow.")
+        from documents.workflows.circuits import _revoke_task_access
+        from documents.workflows.circuits import advance_circuit
+        from documents.workflows.circuits import notify_circuit_task
+
+        pending_tasks = list(run.tasks.filter(
+            status=CircuitTask.Status.PENDING,
+        ).select_related(
+            "assigned_to",
+            "run__document",
+        ))
+        run.tasks.filter(status=CircuitTask.Status.PENDING).update(
+            status=CircuitTask.Status.CANCELLED,
+            completed=timezone.now(),
+        )
+        for task in pending_tasks:
+            task.status = CircuitTask.Status.CANCELLED
+            _revoke_task_access(task)
+            notify_circuit_task(task)
+        pending_signatures = list(run.signature_requests.filter(
+            status__in=[
+                SignatureRequest.Status.PENDING,
+                SignatureRequest.Status.PROCESSING,
+            ],
+        ))
+        run.signature_requests.filter(
+            status__in=[
+                SignatureRequest.Status.PENDING,
+                SignatureRequest.Status.PROCESSING,
+            ],
+        ).update(status=SignatureRequest.Status.CANCELLED, completed=timezone.now())
+        for signature_request in pending_signatures:
+            signature_request.status = SignatureRequest.Status.CANCELLED
+            _notify_signature_request(signature_request)
+        run.step_executions.filter(
+            status__in=[
+                CircuitStepExecution.Status.RUNNING,
+                CircuitStepExecution.Status.WAITING,
+            ],
+        ).update(
+            status=CircuitStepExecution.Status.CANCELLED,
+            completed=timezone.now(),
+            actor=request.user,
+            detail=f"Restarted by an administrator: {reason}"[:2000],
+        )
+        run.current_step = step
+        run.status = CircuitRun.Status.RUNNING
+        run.completed = None
+        run.failure_message = f"Restarted from step {step.pk}: {reason}"
+        run.save(
+            update_fields=[
+                "current_step",
+                "status",
+                "completed",
+                "failure_message",
+                "modified",
+            ],
+        )
+        return Response(self.get_serializer(advance_circuit(run.pk)).data)
+
+    @action(detail=True, methods=["post"])
+    def skip(self, request, pk=None):
+        self._require_manager(request)
+        reason = str(request.data.get("reason", "")).strip()
+        if not reason:
+            raise ValidationError("A reason is required when skipping a step.")
+        run = self.get_object()
+        if not run.current_step_id:
+            raise ValidationError("This run has no current step.")
+        from documents.workflows.circuits import _next_step
+        from documents.workflows.circuits import advance_circuit
+        from documents.workflows.circuits import _revoke_task_access
+        from documents.workflows.circuits import notify_circuit_task
+
+        pending_tasks = list(run.tasks.filter(
+            step=run.current_step,
+            status=CircuitTask.Status.PENDING,
+        ).select_related("assigned_to", "run__document"))
+        run.tasks.filter(
+            step=run.current_step,
+            status=CircuitTask.Status.PENDING,
+        ).update(status=CircuitTask.Status.CANCELLED, completed=timezone.now())
+        for task in pending_tasks:
+            task.status = CircuitTask.Status.CANCELLED
+            _revoke_task_access(task)
+            notify_circuit_task(task)
+        pending_signatures = list(
+            run.signature_requests.filter(
+                circuit_step=run.current_step,
+                status__in=[
+                    SignatureRequest.Status.PENDING,
+                    SignatureRequest.Status.PROCESSING,
+                ],
+            ),
+        )
+        run.signature_requests.filter(
+            circuit_step=run.current_step,
+            status__in=[
+                SignatureRequest.Status.PENDING,
+                SignatureRequest.Status.PROCESSING,
+            ],
+        ).update(status=SignatureRequest.Status.CANCELLED, completed=timezone.now())
+        for signature_request in pending_signatures:
+            signature_request.status = SignatureRequest.Status.CANCELLED
+            _notify_signature_request(signature_request)
+        from documents.workflows.circuits import _finish_step_execution
+
+        _finish_step_execution(
+            run,
+            run.current_step,
+            CircuitStepExecution.Status.SKIPPED,
+            actor=request.user,
+            detail=reason,
+        )
+        run.current_step = _next_step(run.current_step)
+        run.status = CircuitRun.Status.RUNNING
+        run.failure_message = f"Step skipped: {reason}"
+        run.save(update_fields=["current_step", "status", "failure_message", "modified"])
+        return Response(self.get_serializer(advance_circuit(run.pk)).data)
 
 
 class CustomFieldViewSet(PermissionsAwareDocumentCountMixin, ModelViewSet[CustomField]):

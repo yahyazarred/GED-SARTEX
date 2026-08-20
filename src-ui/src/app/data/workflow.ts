@@ -9,6 +9,8 @@ export interface Workflow extends ObjectWithId {
 
   enabled: boolean
 
+  is_circuit?: boolean
+
   triggers: WorkflowTrigger[]
 
   actions: WorkflowAction[]

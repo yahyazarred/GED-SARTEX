@@ -21,6 +21,7 @@ import { Correspondent } from 'src/app/data/correspondent'
 import { Cabinet } from 'src/app/data/cabinet'
 import { CustomField, CustomFieldDataType } from 'src/app/data/custom-field'
 import { DocumentType } from 'src/app/data/document-type'
+import { Group } from 'src/app/data/group'
 import { MailRule } from 'src/app/data/mail-rule'
 import {
   MATCHING_ALGORITHMS,
@@ -29,6 +30,7 @@ import {
 } from 'src/app/data/matching-model'
 import { StoragePath } from 'src/app/data/storage-path'
 import { SETTINGS_KEYS } from 'src/app/data/ui-settings'
+import { User } from 'src/app/data/user'
 import { Workflow } from 'src/app/data/workflow'
 import {
   WorkflowAction,
@@ -45,6 +47,7 @@ import { CabinetService } from 'src/app/services/rest/cabinet.service'
 import { CustomFieldsService } from 'src/app/services/rest/custom-fields.service'
 import { DocumentTypeService } from 'src/app/services/rest/document-type.service'
 import { MailRuleService } from 'src/app/services/rest/mail-rule.service'
+import { GroupService } from 'src/app/services/rest/group.service'
 import { StoragePathService } from 'src/app/services/rest/storage-path.service'
 import { UserService } from 'src/app/services/rest/user.service'
 import { WorkflowService } from 'src/app/services/rest/workflow.service'
@@ -150,6 +153,40 @@ export const WORKFLOW_ACTION_OPTIONS = [
     id: WorkflowActionType.MoveToTrash,
     name: $localize`Move to trash`,
   },
+  {
+    id: WorkflowActionType.Approval,
+    name: $localize`Approval`,
+  },
+  {
+    id: WorkflowActionType.SignatureRequest,
+    name: $localize`Request signature`,
+  },
+  {
+    id: WorkflowActionType.AutomaticMatching,
+    name: $localize`Automatic matching`,
+  },
+]
+
+export const APPROVAL_MODE_OPTIONS = [
+  { id: 'one', name: $localize`One member approves` },
+  { id: 'all', name: $localize`All members approve` },
+]
+
+export const APPROVAL_TARGET_OPTIONS = [
+  { id: 'user', name: $localize`A user` },
+  { id: 'group', name: $localize`A group` },
+]
+
+export const TEMPORARY_ACCESS_OPTIONS = [
+  { id: 'none', name: $localize`Do not change access` },
+  { id: 'view', name: $localize`Temporarily grant view access` },
+  { id: 'change', name: $localize`Temporarily grant edit access` },
+]
+
+export const MATCHING_MODE_OPTIONS = [
+  { id: 'all', name: $localize`All matching metadata` },
+  { id: 'tags', name: $localize`Tags only` },
+  { id: 'cabinet', name: $localize`Cabinet only` },
 ]
 
 export enum TriggerFilterType {
@@ -525,6 +562,10 @@ export class WorkflowEditDialogComponent
   public WorkflowActionType = WorkflowActionType
   public TriggerFilterType = TriggerFilterType
   public filterDefinitions = TRIGGER_FILTER_DEFINITIONS
+  public approvalModeOptions = APPROVAL_MODE_OPTIONS
+  public approvalTargetOptions = APPROVAL_TARGET_OPTIONS
+  public temporaryAccessOptions = TEMPORARY_ACCESS_OPTIONS
+  public matchingModeOptions = MATCHING_MODE_OPTIONS
 
   private readonly correspondentService = inject(CorrespondentService)
   private readonly documentTypeService = inject(DocumentTypeService)
@@ -532,6 +573,7 @@ export class WorkflowEditDialogComponent
   private readonly cabinetService = inject(CabinetService)
   private readonly mailRuleService = inject(MailRuleService)
   private readonly customFieldsService = inject(CustomFieldsService)
+  private readonly groupService = inject(GroupService)
 
   readonly templates = signal<Workflow[]>(undefined)
   readonly correspondents = toSignal(
@@ -558,11 +600,17 @@ export class WorkflowEditDialogComponent
     this.customFieldsService.listAll().pipe(map((result) => result.results)),
     { initialValue: undefined as CustomField[] }
   )
+  readonly groups = toSignal(
+    this.groupService.listAll().pipe(map((result) => result.results)),
+    { initialValue: [] as Group[] }
+  )
   readonly dateCustomFields = computed(() =>
     this.customFields()?.filter((f) => f.data_type === CustomFieldDataType.Date)
   )
 
   expandedItem: number = null
+  activeUsers: User[] = []
+  signerUsers: User[] = []
 
   readonly allowedActionTypes = signal([])
 
@@ -591,6 +639,7 @@ export class WorkflowEditDialogComponent
       name: new FormControl(null),
       order: new FormControl(null),
       enabled: new FormControl(true),
+      is_circuit: new FormControl(false),
       triggers: new FormArray([]),
       actions: new FormArray([]),
     })
@@ -816,6 +865,25 @@ export class WorkflowEditDialogComponent
         }
       )
     }
+
+    formValues.actions?.forEach((action: WorkflowAction) => {
+      const approvalTarget = (action as any).approval_target
+      if (action.type === WorkflowActionType.Approval) {
+        if (approvalTarget === 'group') {
+          action.approval_user = null
+        } else {
+          action.approval_group = null
+        }
+      }
+      delete (action as any).approval_target
+      if (action.type !== WorkflowActionType.Webhook) {
+        action.webhook = null
+      }
+      if (action.type !== WorkflowActionType.Email) {
+        action.email = null
+      }
+      action.passwords = this.parsePasswords(action.passwords as any)
+    })
 
     return formValues
   }
@@ -1274,6 +1342,18 @@ export class WorkflowEditDialogComponent
         passwords: new FormControl(
           this.formatPasswords(action.passwords ?? [])
         ),
+        approval_user: new FormControl(action.approval_user),
+        approval_group: new FormControl(action.approval_group),
+        approval_target: new FormControl(
+          action.approval_group ? 'group' : 'user'
+        ),
+        approval_mode: new FormControl(action.approval_mode ?? 'one'),
+        temporary_access: new FormControl(action.temporary_access ?? 'none'),
+        signature_signer: new FormControl(action.signature_signer),
+        matching_mode: new FormControl(action.matching_mode ?? 'all'),
+        branch_parent_order: new FormControl(
+          action.branch_parent_order ?? null
+        ),
       }),
       { emitEvent }
     )
@@ -1366,7 +1446,7 @@ export class WorkflowEditDialogComponent
     return this.actionTypeOptions.find((t) => t.id === type)?.name ?? ''
   }
 
-  addAction() {
+  addAction(branchParentIndex: number = null) {
     if (!this.object) {
       this.object = Object.assign({}, this.objectForm.value)
     }
@@ -1423,9 +1503,36 @@ export class WorkflowEditDialogComponent
         include_document: false,
       },
       passwords: [],
+      approval_user: null,
+      approval_group: null,
+      approval_mode: 'one',
+      temporary_access: 'none',
+      signature_signer: null,
+      matching_mode: 'all',
+      branch_parent_order: branchParentIndex,
     }
-    this.object.actions.push(action)
+    if (branchParentIndex === null) {
+      this.object.actions.push(action)
+      this.createActionField(action)
+      return
+    }
+
+    const parentAction = this.object.actions[branchParentIndex]
+    const parentActions = this.getBranchParentActions()
+    let insertionIndex = branchParentIndex + 1
+    while (
+      insertionIndex < this.object.actions.length &&
+      parentActions[insertionIndex] === parentAction
+    ) {
+      insertionIndex++
+    }
+    this.object.actions.splice(insertionIndex, 0, action)
     this.createActionField(action)
+    const field = this.actionFields.at(this.actionFields.length - 1)
+    this.actionFields.removeAt(this.actionFields.length - 1)
+    this.actionFields.insert(insertionIndex, field)
+    parentActions.splice(insertionIndex, 0, parentAction)
+    this.restoreBranchParents(parentActions)
   }
 
   removeTrigger(index: number) {
@@ -1434,11 +1541,26 @@ export class WorkflowEditDialogComponent
   }
 
   removeAction(index: number) {
-    this.object.actions.splice(index, 1)
-    this.actionFields.removeAt(index)
+    const removedAction = this.object.actions[index]
+    const parentActions = this.getBranchParentActions()
+    const removeIndexes = this.object.actions
+      .map((action, actionIndex) =>
+        action === removedAction || parentActions[actionIndex] === removedAction
+          ? actionIndex
+          : -1
+      )
+      .filter((actionIndex) => actionIndex >= 0)
+      .reverse()
+    removeIndexes.forEach((actionIndex) => {
+      this.object.actions.splice(actionIndex, 1)
+      this.actionFields.removeAt(actionIndex)
+      parentActions.splice(actionIndex, 1)
+    })
+    this.restoreBranchParents(parentActions)
   }
 
   onActionDrop(event: CdkDragDrop<WorkflowAction[]>) {
+    const parentActions = this.getBranchParentActions()
     moveItemInArray(
       this.object.actions,
       event.previousIndex,
@@ -1447,19 +1569,90 @@ export class WorkflowEditDialogComponent
     const actionField = this.actionFields.at(event.previousIndex)
     this.actionFields.removeAt(event.previousIndex)
     this.actionFields.insert(event.currentIndex, actionField)
+    moveItemInArray(parentActions, event.previousIndex, event.currentIndex)
+    this.normalizeBranchLayout(parentActions)
+  }
+
+  private getBranchParentActions(): (WorkflowAction | null)[] {
+    return this.actionFields.controls.map((control) => {
+      const parent = control.get('branch_parent_order').value
+      return parent === null || parent === undefined
+        ? null
+        : this.object.actions[parent]
+    })
+  }
+
+  private restoreBranchParents(parents: (WorkflowAction | null)[]): void {
+    this.actionFields.controls.forEach((control, index) => {
+      const parentIndex = parents[index]
+        ? this.object.actions.indexOf(parents[index])
+        : -1
+      control
+        .get('branch_parent_order')
+        .setValue(parentIndex >= 0 ? parentIndex : null, { emitEvent: false })
+      this.object.actions[index].branch_parent_order =
+        parentIndex >= 0 ? parentIndex : null
+    })
+  }
+
+  private normalizeBranchLayout(parents: (WorkflowAction | null)[]): void {
+    const entries = this.object.actions.map((action, index) => ({
+      action,
+      control: this.actionFields.at(index),
+      parent: parents[index],
+    }))
+    const ordered = entries
+      .filter((entry) => entry.parent === null)
+      .flatMap((entry) => [
+        entry,
+        ...entries.filter((candidate) => candidate.parent === entry.action),
+      ])
+    this.object.actions.splice(
+      0,
+      this.object.actions.length,
+      ...ordered.map((entry) => entry.action)
+    )
+    this.actionFields.clear({ emitEvent: false })
+    ordered.forEach((entry) =>
+      this.actionFields.push(entry.control, { emitEvent: false })
+    )
+    this.restoreBranchParents(ordered.map((entry) => entry.parent))
+  }
+
+  getActionNumber(index: number): string {
+    const parentIndex = this.actionFields.at(index).get('branch_parent_order').value
+    const mainNumber = (targetIndex: number) =>
+      this.actionFields.controls
+        .slice(0, targetIndex + 1)
+        .filter(
+          (control) => control.get('branch_parent_order').value === null
+        ).length
+    if (parentIndex === null || parentIndex === undefined) {
+      return `${mainNumber(index)}`
+    }
+    const branchPosition = this.actionFields.controls
+      .slice(parentIndex + 1, index + 1)
+      .filter(
+        (control) => control.get('branch_parent_order').value === parentIndex
+      ).length
+    return `${mainNumber(parentIndex)}.${String.fromCharCode(96 + branchPosition)}`
+  }
+
+  protected override onUsersLoaded(users: User[]): void {
+    this.activeUsers = users.filter((user) => user.is_active)
+    this.signerUsers = this.activeUsers.filter((user) => user.is_signer)
   }
 
   save(): void {
     this.objectForm
       .get('actions')
-      .value.forEach((action: WorkflowAction, i) => {
+      .value.forEach((action: WorkflowAction) => {
         if (action.type !== WorkflowActionType.Webhook) {
           action.webhook = null
         }
         if (action.type !== WorkflowActionType.Email) {
           action.email = null
         }
-        action.passwords = this.parsePasswords(action.passwords as any)
       })
     super.save()
   }

@@ -690,6 +690,9 @@ class UiSettings(models.Model):
     )
     settings = models.JSONField(null=True)
 
+    class Meta:
+        default_permissions = ()
+
     def __str__(self):
         return self.user.username
 
@@ -928,6 +931,7 @@ class SignatureProfile(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
     class Meta:
+        default_permissions = ()
         verbose_name = _("signature profile")
         verbose_name_plural = _("signature profiles")
 
@@ -972,6 +976,7 @@ class SignedDocument(ModelWithOwner):
     height = models.FloatField()
 
     class Meta:
+        default_permissions = ("change", "delete", "view")
         ordering = ("-created",)
         constraints = [
             models.UniqueConstraint(
@@ -995,14 +1000,19 @@ class SignatureRequest(models.Model):
 
     document = models.ForeignKey(
         Document,
-        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
         related_name="signature_requests",
     )
     requested_version = models.ForeignKey(
         Document,
-        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
         related_name="signature_requests_as_source",
     )
+    requested_document_title = models.CharField(max_length=128, blank=True)
     requester = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -1031,8 +1041,23 @@ class SignatureRequest(models.Model):
     height = models.FloatField(blank=True, null=True)
     signature_checksum = models.CharField(max_length=64, blank=True)
     failure_message = models.TextField(blank=True)
+    circuit_run = models.ForeignKey(
+        "CircuitRun",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="signature_requests",
+    )
+    circuit_step = models.ForeignKey(
+        "WorkflowStep",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="signature_requests",
+    )
 
     class Meta:
+        default_permissions = ("add", "change", "view")
         ordering = ("-created",)
         constraints = [
             models.UniqueConstraint(
@@ -1044,6 +1069,11 @@ class SignatureRequest(models.Model):
 
     def __str__(self) -> str:
         return f"{self.document_id} → {self.signer.username} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        if not self.requested_document_title and self.requested_version_id:
+            self.requested_document_title = self.requested_version.title
+        return super().save(*args, **kwargs)
 
 
 class ShareLink(SoftDeleteModel):
@@ -1805,6 +1835,9 @@ class WorkflowAction(models.Model):
             6,
             _("Move to trash"),
         )
+        APPROVAL = (7, _("Approval"))
+        SIGNATURE_REQUEST = (8, _("Request signature"))
+        AUTOMATIC_MATCHING = (9, _("Automatic matching"))
 
     type = models.PositiveSmallIntegerField(
         _("Workflow Action Type"),
@@ -2069,6 +2102,52 @@ class WorkflowAction(models.Model):
         ),
     )
 
+    approval_user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="workflow_approval_actions",
+    )
+    approval_group = models.ForeignKey(
+        Group,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="workflow_approval_actions",
+    )
+    approval_mode = models.CharField(
+        max_length=8,
+        choices=(("one", _("One member")), ("all", _("All members"))),
+        default="one",
+    )
+    temporary_access = models.CharField(
+        max_length=8,
+        choices=(
+            ("none", _("Do not modify permissions")),
+            ("view", _("Grant view access")),
+            ("change", _("Grant edit access")),
+        ),
+        default="none",
+    )
+    signature_signer = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="workflow_signature_actions",
+    )
+    matching_mode = models.CharField(
+        max_length=16,
+        choices=(
+            ("all", _("All matching metadata")),
+            ("tags", _("Tags only")),
+            ("cabinet", _("Cabinet only")),
+        ),
+        default="all",
+    )
+    branch_parent_order = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
         verbose_name = _("workflow action")
         verbose_name_plural = _("workflow actions")
@@ -2097,6 +2176,8 @@ class Workflow(models.Model):
     )
 
     enabled = models.BooleanField(_("enabled"), default=True)
+
+    is_circuit = models.BooleanField(_("stateful workflow"), default=False)
 
     def __str__(self):
         return f"Workflow: {self.name}"
@@ -2136,3 +2217,282 @@ class WorkflowRun(SoftDeleteModel):
 
     def __str__(self) -> str:
         return f"WorkflowRun of {self.workflow} at {self.run_at} on {self.document}"
+
+
+class WorkflowStep(models.Model):
+    class StepType(models.TextChoices):
+        ACTION = "action", _("Workflow action")
+        APPROVAL = "approval", _("Approval")
+        SIGNATURE = "signature", _("Signature request")
+        MATCHING = "matching", _("Automatic matching")
+
+    class ApprovalMode(models.TextChoices):
+        ONE = "one", _("One member")
+        ALL = "all", _("All members")
+
+    class AccessMode(models.TextChoices):
+        NONE = "none", _("Do not modify permissions")
+        VIEW = "view", _("Grant view access")
+        CHANGE = "change", _("Grant edit access")
+
+    class MatchingMode(models.TextChoices):
+        ALL = "all", _("All matching metadata")
+        TAGS = "tags", _("Tags only")
+        CABINET = "cabinet", _("Cabinet only")
+
+    workflow = models.ForeignKey(
+        Workflow,
+        on_delete=models.CASCADE,
+        related_name="steps",
+    )
+    name = models.CharField(_("name"), max_length=256)
+    order = models.PositiveIntegerField(_("order"), default=0)
+    type = models.CharField(max_length=16, choices=StepType.choices)
+    action = models.ForeignKey(
+        WorkflowAction,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="circuit_steps",
+    )
+    approval_user = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="approval_steps",
+    )
+    approval_group = models.ForeignKey(
+        Group,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="approval_steps",
+    )
+    approval_mode = models.CharField(
+        max_length=8,
+        choices=ApprovalMode.choices,
+        default=ApprovalMode.ONE,
+    )
+    temporary_access = models.CharField(
+        max_length=8,
+        choices=AccessMode.choices,
+        default=AccessMode.NONE,
+    )
+    signature_signer = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="signature_steps",
+    )
+    matching_mode = models.CharField(
+        max_length=16,
+        choices=MatchingMode.choices,
+        default=MatchingMode.ALL,
+    )
+    rejection_step = models.ForeignKey(
+        "self",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="rejection_sources",
+    )
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("order", "pk")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow", "order"],
+                name="documents_unique_workflow_step_order",
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.type == self.StepType.ACTION and self.action_id is None:
+            raise ValidationError({"action": _("An action step requires an action.")})
+        if (
+            self.type == self.StepType.ACTION
+            and self.action_id is not None
+            and self.workflow_id is not None
+            and not self.workflow.actions.filter(pk=self.action_id).exists()
+        ):
+            raise ValidationError(
+                {"action": _("The action must belong to this workflow.")},
+            )
+        if self.type == self.StepType.APPROVAL:
+            if bool(self.approval_user_id) == bool(self.approval_group_id):
+                raise ValidationError(
+                    _("An approval step requires exactly one user or group."),
+                )
+        if self.type == self.StepType.SIGNATURE and self.signature_signer_id is None:
+            raise ValidationError(
+                {"signature_signer": _("A signature step requires a signer.")},
+            )
+        if self.rejection_step_id and self.rejection_step.workflow_id != self.workflow_id:
+            raise ValidationError(
+                {"rejection_step": _("The rejection step must belong to this workflow.")},
+            )
+
+
+class CircuitRun(models.Model):
+    class Status(models.TextChoices):
+        RUNNING = "running", _("Running")
+        WAITING = "waiting", _("Waiting")
+        COMPLETED = "completed", _("Completed")
+        REJECTED = "rejected", _("Rejected")
+        CANCELLED = "cancelled", _("Cancelled")
+        FAILED = "failed", _("Failed")
+
+    workflow = models.ForeignKey(
+        Workflow,
+        on_delete=models.CASCADE,
+        related_name="circuit_runs",
+    )
+    document = models.ForeignKey(
+        Document,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="circuit_runs",
+    )
+    trigger_type = models.PositiveSmallIntegerField(
+        choices=WorkflowTrigger.WorkflowTriggerType.choices,
+        null=True,
+    )
+    current_step = models.ForeignKey(
+        WorkflowStep,
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        related_name="active_runs",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.RUNNING,
+        db_index=True,
+    )
+    started_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="started_circuit_runs",
+    )
+    started = models.DateTimeField(default=timezone.now, db_index=True)
+    modified = models.DateTimeField(auto_now=True)
+    completed = models.DateTimeField(blank=True, null=True)
+    failure_message = models.TextField(blank=True)
+
+    class Meta:
+        default_permissions = ("add", "change", "view")
+        verbose_name = _("workflow activity")
+        verbose_name_plural = _("workflow activity")
+        ordering = ("-started",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow", "document"],
+                condition=models.Q(status__in=["running", "waiting"]),
+                name="documents_unique_active_circuit_run",
+            ),
+        ]
+
+
+class CircuitStepExecution(models.Model):
+    class Status(models.TextChoices):
+        RUNNING = "running", _("Running")
+        WAITING = "waiting", _("Waiting")
+        SUCCEEDED = "succeeded", _("Succeeded")
+        REJECTED = "rejected", _("Rejected")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+        CANCELLED = "cancelled", _("Cancelled")
+
+    run = models.ForeignKey(
+        CircuitRun,
+        on_delete=models.CASCADE,
+        related_name="step_executions",
+    )
+    step = models.ForeignKey(
+        WorkflowStep,
+        on_delete=models.PROTECT,
+        related_name="executions",
+    )
+    attempt = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=16, choices=Status.choices, db_index=True)
+    started = models.DateTimeField(default=timezone.now, db_index=True)
+    completed = models.DateTimeField(blank=True, null=True)
+    actor = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="circuit_step_executions",
+    )
+    detail = models.TextField(blank=True, max_length=2000)
+    error = models.TextField(blank=True, max_length=4000)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("started", "pk")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "step", "attempt"],
+                name="documents_unique_circuit_step_attempt",
+            ),
+        ]
+
+
+class CircuitTask(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+        CANCELLED = "cancelled", _("Cancelled")
+
+    run = models.ForeignKey(CircuitRun, on_delete=models.CASCADE, related_name="tasks")
+    step = models.ForeignKey(WorkflowStep, on_delete=models.PROTECT, related_name="tasks")
+    assigned_to = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="circuit_tasks",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    comment = models.TextField(blank=True, max_length=2000)
+    decided_by = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="decided_circuit_tasks",
+    )
+    created = models.DateTimeField(default=timezone.now, db_index=True)
+    completed = models.DateTimeField(blank=True, null=True)
+    attempt = models.PositiveIntegerField(default=1)
+    granted_view = models.BooleanField(default=False)
+    granted_change = models.BooleanField(default=False)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("-created",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "step", "assigned_to", "attempt"],
+                name="documents_unique_circuit_task_assignee",
+            ),
+        ]
+
+
+if settings.AUDIT_LOG_ENABLED:
+    auditlog.register(Workflow)
+    auditlog.register(WorkflowStep)
+    auditlog.register(CircuitRun)
+    auditlog.register(CircuitStepExecution)
+    auditlog.register(CircuitTask)

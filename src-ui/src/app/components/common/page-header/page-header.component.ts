@@ -22,6 +22,7 @@ export class PageHeaderComponent {
   readonly infoLink = input<string>(undefined)
   readonly loading = input(false)
   readonly title = input('')
+  readonly icon = input<string>(undefined)
   readonly copied = signal(false)
   private copyTimeout: any
 
