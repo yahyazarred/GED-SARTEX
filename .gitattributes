@@ -1,0 +1,7 @@
+# Container entrypoints and helper scripts must use Unix line endings even
+# when the repository is checked out and committed from Windows.
+Dockerfile text eol=lf
+docker/rootfs/** text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
